@@ -117,6 +117,7 @@ $env:STATA_WORKBENCH_CODE = "C:\path\to\Code.exe"
 - Known limitations: `docs/LIMITATIONS.md`
 - FAQ: `docs/FAQ.md`
 - Publishing: `docs/PUBLISHING.md`
+- Maintenance workflow: `docs/MAINTENANCE.md`
 - Roadmap: `docs/ROADMAP.md`
 - Troubleshooting: `docs/TROUBLESHOOTING.md`
 

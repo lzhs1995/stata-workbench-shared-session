@@ -11,6 +11,10 @@ Public channels:
 
 The Visual Studio Marketplace package is not currently published. Marketplace publication is deferred because it requires the Microsoft publisher/PAT workflow.
 
+## Maintenance Workflow
+
+Before publishing a runtime patch that was developed in the live Stata workspace, follow `docs/MAINTENANCE.md`. In short: export only whitelisted runtime scripts from the workspace, check the extension bundle separately, then run the packaging and smoke-test checklist below.
+
 ## GitHub Release
 
 To recreate the package locally:
