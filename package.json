@@ -1,0 +1,186 @@
+{
+  "name": "stata-workbench-shared-session",
+  "displayName": "Stata Workbench Shared Session",
+  "description": "A patched Stata Workbench distribution focused on visible human-agent shared sessions, resilient lifecycle recovery, and graph-panel routing.",
+  "version": "0.1.0",
+  "publisher": "lzhs",
+  "author": "LZHS and contributors",
+  "license": "AGPL-3.0-or-later",
+  "homepage": "https://github.com/LZHS/stata-workbench-shared-session",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/LZHS/stata-workbench-shared-session.git"
+  },
+  "bugs": {
+    "url": "https://github.com/LZHS/stata-workbench-shared-session/issues"
+  },
+  "engines": {
+    "vscode": "^1.75.0",
+    "node": ">=22.14.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Data Science",
+    "Machine Learning",
+    "Other"
+  ],
+  "keywords": [
+    "stata",
+    "statistics",
+    "data science",
+    "mcp",
+    "ai",
+    "shared session",
+    "visible terminal"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "stata-workbench.runSelection",
+        "title": "Stata: Run Selection/Current Line",
+        "icon": "$(play)"
+      },
+      {
+        "command": "stata-workbench.runFile",
+        "title": "Stata: Run Current File",
+        "icon": "$(run-all)"
+      },
+      {
+        "command": "stata-workbench.testMcpServer",
+        "title": "Stata: Test MCP Server Connection"
+      },
+      {
+        "command": "stata-workbench.viewData",
+        "title": "Stata: View Data",
+        "icon": "$(table)"
+      },
+      {
+        "command": "stata-workbench.installMcpCli",
+        "title": "Stata: Install MCP CLI",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "stata-workbench.cancelRequest",
+        "title": "Stata: Cancel Current Request",
+        "icon": "$(debug-stop)"
+      },
+      {
+        "command": "stata-workbench.openTerminal",
+        "title": "Stata: Open Interactive Terminal",
+        "icon": "$(terminal)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "when": "resourceExtname == .do || resourceExtname == .ado || resourceExtname == .mata || editorLangId == stata",
+          "command": "stata-workbench.runSelection",
+          "group": "navigation@1"
+        },
+        {
+          "when": "resourceExtname == .do || resourceExtname == .ado || resourceExtname == .mata || editorLangId == stata",
+          "command": "stata-workbench.runFile",
+          "group": "navigation@2"
+        }
+      ],
+      "editor/context": [
+        {
+          "when": "resourceExtname == .do || resourceExtname == .ado || resourceExtname == .mata || editorLangId == stata",
+          "command": "stata-workbench.runSelection",
+          "group": "1_stata"
+        },
+        {
+          "when": "resourceExtname == .do || resourceExtname == .ado || resourceExtname == .mata || editorLangId == stata",
+          "command": "stata-workbench.runFile",
+          "group": "1_stata"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "stata-workbench.runSelection",
+        "key": "ctrl+shift+enter",
+        "mac": "cmd+shift+enter",
+        "when": "editorTextFocus && (editorLangId == stata || resourceExtname == .do || resourceExtname == .ado || resourceExtname == .mata)"
+      },
+      {
+        "command": "stata-workbench.runFile",
+        "key": "ctrl+shift+d",
+        "mac": "cmd+shift+d",
+        "when": "editorTextFocus && (editorLangId == stata || resourceExtname == .do || resourceExtname == .ado || resourceExtname == .mata)"
+      },
+      {
+        "command": "stata-workbench.openTerminal",
+        "key": "ctrl+shift+c",
+        "mac": "cmd+shift+c"
+      }
+    ],
+    "configuration": {
+      "title": "Stata Workbench Shared Session",
+      "properties": {
+        "stataMcp.requestTimeoutMs": {
+          "type": "number",
+          "default": 100000,
+          "description": "Timeout in milliseconds for Stata metadata and UI requests."
+        },
+        "stataMcp.enableExecuteTimeout": {
+          "type": "boolean",
+          "default": false,
+          "description": "Enable timeout for Stata execution commands. Disabled by default for long-running research scripts."
+        },
+        "stataMcp.loadStataOnStartup": {
+          "type": "boolean",
+          "default": false,
+          "description": "Load Stata automatically when VS Code starts."
+        },
+        "stataMcp.autoRevealOutput": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically show the Stata output channel after runs."
+        },
+        "stataMcp.showAllLogsInOutput": {
+          "type": "boolean",
+          "default": false,
+          "description": "Stream all raw mcp-stata logs to the Stata Workbench Output channel."
+        },
+        "stataMcp.logStataCode": {
+          "type": "boolean",
+          "default": false,
+          "description": "Log Stata code sent to the backend."
+        },
+        "stataMcp.autoConfigureMcp": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically add or update mcp-stata in host MCP config."
+        },
+        "stataMcp.runFileWorkingDirectory": {
+          "type": "string",
+          "default": "",
+          "description": "Working directory for running .do files. Supports absolute paths, ~, ${workspaceFolder}, and ${fileDir}."
+        },
+        "stataMcp.maxOutputLines": {
+          "type": "number",
+          "default": 2000,
+          "description": "Maximum output lines shown in the Stata Terminal webview."
+        },
+        "stataMcp.stataPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to the local Stata executable."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "check": "node --check dist/extension.js && node --check scripts/patch_manager.js",
+    "package": "vsce package",
+    "package:pre": "npm run check"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^3.3.2"
+  }
+}

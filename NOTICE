@@ -1,0 +1,20 @@
+Stata Workbench Shared Session
+Copyright (c) LZHS and contributors.
+
+This project is a derivative distribution and local extension of:
+
+- tmonk/stata-workbench
+  Homepage: https://github.com/tmonk/stata-workbench
+  License according to upstream package metadata: AGPL-3.0-or-later
+  Original author metadata: Thomas Monk
+
+This project also incorporates design comparisons, compatibility lessons, or separately attributed ideas from:
+
+- hanlulong/stata-mcp
+  Homepage: https://github.com/hanlulong/stata-mcp
+  License: MIT
+  Copyright (c) 2025 Lu Han
+
+No Stata binaries, Stata license files, private research datasets, or private research outputs are included in this repository.
+
+Stata is a trademark of StataCorp LLC. This project is not affiliated with or endorsed by StataCorp LLC.
