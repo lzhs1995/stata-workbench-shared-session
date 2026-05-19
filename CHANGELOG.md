@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Added `docs/MAINTENANCE.md` documenting the workspace-first runtime patch workflow and repo-only release workflow.
+- Added `scripts/export_to_repo.ps1` for previewing and applying a narrow workspace-to-repo runtime script export with SHA256 comparisons.
+
 ## 0.1.1
 
 - Added nine public taught-task Stata examples under `examples/taught-tasks/`.
