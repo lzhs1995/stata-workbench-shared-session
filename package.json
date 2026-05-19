@@ -3,16 +3,16 @@
   "displayName": "Stata Workbench Shared Session",
   "description": "A patched Stata Workbench distribution focused on visible human-agent shared sessions, resilient lifecycle recovery, and graph-panel routing.",
   "version": "0.1.0",
-  "publisher": "lzhs",
+  "publisher": "lzhs1995",
   "author": "LZHS and contributors",
   "license": "AGPL-3.0-or-later",
-  "homepage": "https://github.com/LZHS/stata-workbench-shared-session",
+  "homepage": "https://github.com/lzhs1995/stata-workbench-shared-session",
   "repository": {
     "type": "git",
-    "url": "https://github.com/LZHS/stata-workbench-shared-session.git"
+    "url": "https://github.com/lzhs1995/stata-workbench-shared-session.git"
   },
   "bugs": {
-    "url": "https://github.com/LZHS/stata-workbench-shared-session/issues"
+    "url": "https://github.com/lzhs1995/stata-workbench-shared-session/issues"
   },
   "engines": {
     "vscode": "^1.75.0",

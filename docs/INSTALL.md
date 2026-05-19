@@ -9,7 +9,7 @@ code --install-extension .\stata-workbench-shared-session-0.1.0.vsix
 ## From source
 
 ```powershell
-git clone https://github.com/LZHS/stata-workbench-shared-session.git
+git clone https://github.com/lzhs1995/stata-workbench-shared-session.git
 cd stata-workbench-shared-session
 npm install
 npm run package
