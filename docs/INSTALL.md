@@ -1,15 +1,23 @@
 # Installation
 
-## From VSIX
+## Install from Open VSX
 
-Download the VSIX from the `v0.1.0` GitHub Release:
+The extension is published on Open VSX:
 
-https://github.com/lzhs1995/stata-workbench-shared-session/releases/tag/v0.1.0
+https://open-vsx.org/extension/lzhs1995/stata-workbench-shared-session
+
+Use this route for Open VSX-compatible editors such as VSCodium, Cursor, and Windsurf when their extension UI can read Open VSX.
+
+## Install from GitHub Release VSIX
+
+Download the latest VSIX from:
+
+https://github.com/lzhs1995/stata-workbench-shared-session/releases
 
 Then install it:
 
 ```powershell
-code --install-extension .\stata-workbench-shared-session-0.1.0.vsix
+code --install-extension .\stata-workbench-shared-session-0.1.1.vsix
 ```
 
 If the `code` command is unavailable, open VS Code and use:
@@ -18,27 +26,47 @@ If the `code` command is unavailable, open VS Code and use:
 Extensions: Install from VSIX...
 ```
 
-## From source
+## Visual Studio Marketplace
+
+The extension is not currently published on the Visual Studio Marketplace. Marketplace publication is deferred because it requires the Microsoft Marketplace publisher/PAT flow. Use Open VSX or the GitHub Release VSIX instead.
+
+## Install from Source
 
 ```powershell
 git clone https://github.com/lzhs1995/stata-workbench-shared-session.git
 cd stata-workbench-shared-session
 npm install
 npm run package
-code --install-extension .\stata-workbench-shared-session-0.1.0.vsix
+code --install-extension .\stata-workbench-shared-session-0.1.1.vsix
 ```
 
 ## Configure Stata
 
 Set `stataMcp.stataPath` to your local Stata executable path in VS Code settings.
 
-Do not commit your local path, license files, or local data into the repository.
+The tested baseline is Stata 18 MP on Windows. Do not commit your local path, license files, or local data into the repository.
 
-## Smoke test
+## Minimal Smoke Test
 
-1. Open `examples/stata_workbench_smoke.do`.
+1. Open `examples/minimal-workspace/smoke.do`.
 2. Run `Stata: Open Interactive Terminal`.
 3. Run `Stata: Run Current File` or select the file contents and run `Stata: Run Selection/Current Line`.
 4. Confirm the Stata Terminal prints `STATA_WORKBENCH_SMOKE_OK`.
 
-Direct Marketplace and Open VSX installation are not available until those registries are published.
+## Taught Task Smoke Test
+
+After the minimal smoke test, open:
+
+```text
+examples/taught-tasks/taught_task1.do
+```
+
+Run it through `Stata: Run Current File`. It uses Stata's built-in `auto` data and writes outputs relative to the current working directory. For portable behavior, set:
+
+```json
+{
+  "stataMcp.runFileWorkingDirectory": "${fileDir}"
+}
+```
+
+See `examples/taught-tasks/README.md` before running the larger stress fixtures.

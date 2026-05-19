@@ -1,16 +1,25 @@
 # Roadmap
 
-## Near term
+## Near Term
 
-- Publish `v0.1.0` to Visual Studio Marketplace.
-- Publish `v0.1.0` to Open VSX.
-- Add screenshots or a short GIF for install and smoke-test flow.
-- Expand the minimal demo workspace.
+- Keep GitHub Release VSIX and Open VSX packages aligned.
+- Add screenshots or short GIFs showing `Stata Terminal`, `Stata Graphs`, and taught task output.
+- Add smaller focused demo files for graph routing, `putdocx`, and bridge recovery.
+- Improve clean-profile smoke-test instructions for community contributors.
 
-## Later
+## Documentation
 
-- Add automated extension-host smoke tests where feasible.
-- Document cross-editor behavior for VSCodium, Cursor, and Windsurf.
-- Collect community feedback on graph routing, recovery scripts, and long-run workflows.
-- Split internal maintenance notes from user-facing documentation as the project matures.
+- Expand the taught task guide with screenshots and expected output snippets.
+- Add a contributor checklist for reproducing bridge bugs.
+- Document known editor differences across VS Code, VSCodium, Cursor, and Windsurf.
 
+## Packaging
+
+- Continue excluding private data, local logs, generated outputs, Stata license files, and tokens.
+- Consider Visual Studio Marketplace publication only if the publisher/PAT workflow becomes worthwhile.
+
+## Runtime
+
+- Improve graph-panel diagnostics and examples.
+- Keep visible execution, single-flight bridge behavior, and audit-log verification as the default workflow.
+- Collect community feedback for non-Windows and non-Stata 18 MP setups before claiming broader support.

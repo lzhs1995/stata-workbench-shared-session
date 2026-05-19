@@ -29,4 +29,4 @@ If `code --version` fails, install from VSIX through the VS Code UI or fix your 
 
 ## Marketplace or Open VSX cannot find the extension
 
-For `v0.1.0`, GitHub Release VSIX is the available public channel. Marketplace and Open VSX links will work only after those registry publications are completed.
+For current releases, use Open VSX or the GitHub Release VSIX. The Visual Studio Marketplace package is not currently published.

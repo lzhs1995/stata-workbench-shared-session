@@ -1,0 +1,124 @@
+[
+  {
+    "id": "task1",
+    "file": "taught_task1.do",
+    "title": "Shared-session pressure smoke",
+    "scale": "medium",
+    "recommendedFirst": true,
+    "features": [
+      "visible terminal",
+      "graph panel",
+      "putdocx",
+      "large SMCL",
+      "session stability"
+    ]
+  },
+  {
+    "id": "task2",
+    "file": "taught_task2.do",
+    "title": "Generated Workbench stress",
+    "scale": "large",
+    "recommendedFirst": false,
+    "features": [
+      "expanded auto data",
+      "generated variables",
+      "dense output",
+      "graph/table stress"
+    ]
+  },
+  {
+    "id": "task3",
+    "file": "taught_task3.do",
+    "title": "Self-check stress script",
+    "scale": "large",
+    "recommendedFirst": false,
+    "features": [
+      "Stata 18",
+      "progress markers",
+      "graph/table/document output"
+    ]
+  },
+  {
+    "id": "task4",
+    "file": "taught_task4.do",
+    "title": "Larger self-check stress",
+    "scale": "large",
+    "recommendedFirst": false,
+    "features": [
+      "larger workload",
+      "graph routing",
+      "terminal lifecycle"
+    ]
+  },
+  {
+    "id": "task5",
+    "file": "taught_task5.do",
+    "title": "Document and graph stress",
+    "scale": "large",
+    "recommendedFirst": false,
+    "features": [
+      "putdocx",
+      "graphs",
+      "tables",
+      "generated variables"
+    ]
+  },
+  {
+    "id": "task6",
+    "file": "taught_task6.do",
+    "title": "Heavier document/graph run",
+    "scale": "large",
+    "recommendedFirst": false,
+    "features": [
+      "long visible run",
+      "graph loops",
+      "regressions",
+      "document output"
+    ]
+  },
+  {
+    "id": "task7",
+    "file": "taught_task7.do",
+    "title": "Applied-method diversity",
+    "scale": "large",
+    "recommendedFirst": false,
+    "features": [
+      "DiD",
+      "IV-style setup",
+      "matching-style setup",
+      "mediation-style setup",
+      "event-study style",
+      "coefplot stress"
+    ]
+  },
+  {
+    "id": "task8",
+    "file": "taught_task8.do",
+    "title": "Extreme Workbench stress",
+    "scale": "extreme",
+    "recommendedFirst": false,
+    "features": [
+      "100+ graph workload",
+      "nested braces",
+      "preserve/restore",
+      "event study",
+      "IV",
+      "matching",
+      "mediation"
+    ]
+  },
+  {
+    "id": "task9",
+    "file": "taught_task9.do",
+    "title": "MI/document-heavy advanced fixture",
+    "scale": "extreme",
+    "recommendedFirst": false,
+    "features": [
+      "multiple imputation",
+      "synthetic longitudinal data",
+      "survey/panel workflows",
+      "document output",
+      "native baseline stress"
+    ]
+  }
+]

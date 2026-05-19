@@ -1,0 +1,5 @@
+{
+  "stataMcp.runFileWorkingDirectory": "${fileDir}",
+  "stataMcp.maxOutputLines": 2000,
+  "stataMcp.enableExecuteTimeout": false
+}

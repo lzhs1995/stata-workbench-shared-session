@@ -23,6 +23,8 @@ node_modules/**
 *.bak
 *.backup*
 7_temp/**
+**/7_temp/**
+**/4_tables/**
 mcp-stata-temp/**
 .env
 .env.*

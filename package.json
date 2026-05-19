@@ -2,7 +2,7 @@
   "name": "stata-workbench-shared-session",
   "displayName": "Stata Workbench Shared Session",
   "description": "A patched Stata Workbench distribution focused on visible human-agent shared sessions, resilient lifecycle recovery, and graph-panel routing.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "lzhs1995",
   "author": "LZHS and contributors",
   "license": "AGPL-3.0-or-later",
