@@ -9,3 +9,5 @@ The project keeps one visible Stata working site for both humans and agents:
 5. Recovery scripts handle stale UI, stopped session state, force reset, and panic-kill workflows.
 
 The local verification model treats `ok:true` as insufficient by itself. A valid long run must also provide log evidence, output freshness, and true READY state.
+
+This distribution intentionally keeps visible execution as the default. Hidden Stata backends, isolated PyStata runs, or direct Stata executables are not equivalent evidence for the shared-session workflow.

@@ -15,3 +15,18 @@ Use segmented execution, preserve logs under a run root, and verify output fresh
 ## Stata session is stopped
 
 Use the recovery scripts in `scripts/` and verify true READY before productive work.
+
+## The `code` command cannot install the VSIX
+
+Confirm which executable PowerShell resolves:
+
+```powershell
+Get-Command code
+code --version
+```
+
+If `code --version` fails, install from VSIX through the VS Code UI or fix your shell PATH so `code` points to the current VS Code `bin\code.cmd`.
+
+## Marketplace or Open VSX cannot find the extension
+
+For `v0.1.0`, GitHub Release VSIX is the available public channel. Marketplace and Open VSX links will work only after those registry publications are completed.

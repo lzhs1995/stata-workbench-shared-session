@@ -3,7 +3,6 @@
 .vscode/**
 .vscode-test/**
 node_modules/**
-examples/**
 *.vsix
 *.log
 *.smcl
@@ -14,6 +13,7 @@ examples/**
 *.jpg
 *.jpeg
 *.svg
+!media/icon.png
 *.pdf
 *.docx
 *.xlsx

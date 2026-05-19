@@ -9,6 +9,7 @@ node_modules/
 *.jpg
 *.jpeg
 *.svg
+!media/icon.png
 *.pdf
 *.docx
 *.xlsx

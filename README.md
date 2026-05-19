@@ -6,7 +6,12 @@ The project is derived from `tmonk/stata-workbench` and incorporates local desig
 
 ## Status
 
-This repository is being prepared as a clean public release from a local research workspace. The first public channel is expected to be a GitHub Release with a `.vsix` package. Marketplace publication can follow after publisher identity and token setup.
+Version `v0.1.0` is available now as a GitHub Release with an attached VSIX package:
+
+- Release: https://github.com/lzhs1995/stata-workbench-shared-session/releases/tag/v0.1.0
+- VSIX: `stata-workbench-shared-session-0.1.0.vsix`
+
+Visual Studio Marketplace and Open VSX publication are planned next. Until those channels are published, install from the GitHub Release VSIX.
 
 ## Features
 
@@ -29,13 +34,23 @@ This project does not include Stata, Stata license files, private data, or resea
 
 ## Install from VSIX
 
-After a `.vsix` package is available:
+Download `stata-workbench-shared-session-0.1.0.vsix` from the `v0.1.0` GitHub Release, then run:
 
 ```powershell
 code --install-extension .\stata-workbench-shared-session-0.1.0.vsix
 ```
 
 Then configure your local Stata path in VS Code settings.
+
+Marketplace and Open VSX direct install links will be added after publication.
+
+## Quick smoke test
+
+Open `examples/stata_workbench_smoke.do`, then run the current line/selection through `Stata: Run Selection/Current Line`. A healthy run prints:
+
+```text
+STATA_WORKBENCH_SMOKE_OK
+```
 
 ## Development
 
@@ -60,6 +75,13 @@ $env:STATA_WORKBENCH_CODE = "C:\path\to\Code.exe"
 - Do not commit private `.dta`, `.csv`, tables, graphs, or logs.
 - Do not publish local `7_temp` run evidence.
 - Do not describe hidden Stata execution as shared-session execution.
+
+## Community docs
+
+- Known limitations: `docs/LIMITATIONS.md`
+- FAQ: `docs/FAQ.md`
+- Publishing: `docs/PUBLISHING.md`
+- Roadmap: `docs/ROADMAP.md`
 
 ## Upstream attribution
 

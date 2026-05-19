@@ -6,6 +6,7 @@
   "publisher": "lzhs1995",
   "author": "LZHS and contributors",
   "license": "AGPL-3.0-or-later",
+  "icon": "media/icon.png",
   "homepage": "https://github.com/lzhs1995/stata-workbench-shared-session",
   "repository": {
     "type": "git",

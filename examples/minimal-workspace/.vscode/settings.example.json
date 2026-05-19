@@ -1,0 +1,11 @@
+{
+  "stataMcp.stataPath": "C:\\path\\to\\StataMP-64.exe",
+  "stataMcp.loadStataOnStartup": false,
+  "stataMcp.autoRevealOutput": false,
+  "stataMcp.showAllLogsInOutput": false,
+  "stataMcp.logStataCode": false,
+  "stataMcp.autoConfigureMcp": false,
+  "stataMcp.runFileWorkingDirectory": "${workspaceFolder}",
+  "stataMcp.maxOutputLines": 2000
+}
+
