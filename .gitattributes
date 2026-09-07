@@ -1,0 +1,6 @@
+# Preserve hash-bound bundle, replay fixtures and runtime helper bytes on checkout.
+dist/** -text
+src/** -text
+scripts/** -text
+tests/fixtures/extension.js.* -text
+*.vsix binary

@@ -40,6 +40,9 @@ const MANIFEST = path.join(WORKSPACE, "stata_workbench_patch_manifest.json");
 const PATCHED_BASELINE = path.join(WORKSPACE, "dist", "extension.js");
 const BRIDGE_URL = { host: "127.0.0.1", port: 17485, path: "/status" };
 const GRAPH_STATUS_URL = { host: "127.0.0.1", port: 17485, path: "/graph-status" };
+const CLI_ARGS = process.argv.slice(2);
+const TARGET_REPO = CLI_ARGS.includes("--target=repo") ||
+  CLI_ARGS.some((arg, index) => arg === "--target" && CLI_ARGS[index + 1] === "repo");
 
 const REQUIRED_MARKERS = [
   {
@@ -84,8 +87,238 @@ const REQUIRED_MARKERS = [
   },
   {
     key: "visibleBridgePatchMarker",
-    label: "visible bridge returns V6 cleanup marker",
-    marker: "codex-display-only-clear-v6-cleanup",
+    label: "visible bridge returns rc.7 shared-execution marker",
+    marker: "codex-rc7-shared-execution",
+  },
+  {
+    key: "visibleBridgeTransientPortRebind",
+    label: "surviving extension host retries transient bridge-port ownership races",
+    marker: "codex patch rc.7.10.31: bridge retries transient EADDRINUSE",
+  },
+  {
+    key: "sharedExecutionLifecycle",
+    label: "all visible entry points share the rc.7 execution lifecycle",
+    marker: "codex patch rc.7: shared execution lifecycle",
+  },
+  {
+    key: "forceResetGenerationFence",
+    label: "force reset fences cancelled handlers before post-run Stata work",
+    marker: "codex patch rc.7.9: force-reset generation fences stale handlers",
+  },
+  {
+    key: "forceResetLifecycleFinalization",
+    label: "force reset finalizes the cancelled lifecycle before readiness",
+    marker: "codex patch rc.7.9.1: force-reset finalizes cancelled lifecycle",
+  },
+  {
+    key: "forceResetBackendReconnect",
+    label: "force reset reconnects its owned MCP backend before exposing READY",
+    marker: "codex patch rc.7.10.15: force reset reconnects before READY",
+  },
+  {
+    key: "boundedMcpLogNotifications",
+    label: "mcp-stata runtime writes full logs before timeout-bounded notifications",
+    marker: "codex patch rc.7.10.18: timeout-bounded MCP log notifications",
+  },
+  {
+    key: "softStopDatasetRollback",
+    label: "UI Stop cancels without disposing the backend and restores the pre-run dataset",
+    marker: "codex patch rc.7.10: soft Stop preserves the pre-run dataset",
+  },
+  {
+    key: "softStopBoundedBreak",
+    label: "UI Stop always sends a bounded Stata break instead of waiting for natural completion",
+    marker: "codex patch rc.7.10.1: soft Stop always requests bounded break_session",
+  },
+  {
+    key: "softStopServerTaskCancellation",
+    label: "UI Stop cancels the actual mcp-stata background task before restoring state",
+    marker: "codex patch rc.7.10.2: soft Stop cancels the server background task",
+  },
+  {
+    key: "softStopOwnedBackendFallback",
+    label: "UI Stop restores the dataset after a bounded owned-backend fallback",
+    marker: "codex patch rc.7.10.3: soft Stop hard fallback restores the dataset",
+  },
+  {
+    key: "softStopSnapshotlessQuiescence",
+    label: "UI Stop proves backend quiescence even when no dataset snapshot exists",
+    marker: "codex patch rc.7.10.4: snapshotless Stop proves backend quiescence",
+  },
+  {
+    key: "softStopHardFallbackReconnect",
+    label: "UI Stop reconnects its owned transport before hard-fallback dataset restore",
+    marker: "codex patch rc.7.10.5: hard fallback reconnects before restore",
+  },
+  {
+    key: "softStopStaleReconnectRetry",
+    label: "UI Stop retries one owned reset after a stale reconnect",
+    marker: "codex patch rc.7.10.6: stale reconnect gets one owned retry",
+  },
+  {
+    key: "softStopBoundedCancellationLatency",
+    label: "UI Stop bounds task cancellation and break opportunities to 2.5 seconds each",
+    marker: "codex patch rc.7.10.7: bounded cancellation latency",
+  },
+  {
+    key: "softStopBridgeEndpoint",
+    label: "shared localhost bridge exposes the same soft Stop lifecycle",
+    marker: "codex patch rc.7.10.34: shared bridge exposes soft Stop",
+  },
+  {
+    key: "structuralLongSelectionWatchdog",
+    label: "manual selections with structurally long work avoid the 120-second watchdog",
+    marker: "codex patch rc.7.10.8: structural long-selection watchdog",
+  },
+  {
+    key: "largeDocumentGraphPreLogWatchdog",
+    label: "large document graph runs avoid the five-minute pre-log boundary on all visible entry points",
+    marker: "codex patch rc.7.10.48: large document graph runs extend the pre-log watchdog",
+  },
+  {
+    key: "manualSelectionPolicyScope",
+    label: "manual-selection command handlers can access the long-run policy",
+    marker: "codex patch rc.7.10.8.1: manual run policy is command-visible",
+  },
+  {
+    key: "longManualSelectionExactMarker",
+    label: "long source-preserving manual selections retain exact completion evidence",
+    marker: "codex patch rc.7.10.9: long manual selections keep exact completion markers",
+  },
+  {
+    key: "executionLifecycleStatus",
+    label: "/status exposes canonical execution lifecycle diagnostics",
+    marker: "__codexExecution.publicLifecycle(o)",
+  },
+  {
+    key: "executionLifecycleReleaseProof",
+    label: "visible Agent receipts expose verified lifecycle release evidence",
+    marker: "codex patch rc.7: lifecycle release proof",
+  },
+  {
+    key: "executionLifecycleManualEvidence",
+    label: "Manual and Agent release share exact log-evidence inference",
+    marker: "codex patch rc.7: release infers manual evidence",
+  },
+  {
+    key: "executionLifecycleFinalLogDiscovery",
+    label: "release binds the exact current-run Stata log",
+    marker: "codex patch rc.7.5: exact-marker log overrides stale log",
+  },
+  {
+    key: "executionLifecycleWatchdogLogOwnership",
+    label: "watchdog rejects stale logs and stale end-of-do-file evidence",
+    marker: "codex patch rc.7.6: watchdog log ownership is run-scoped",
+  },
+  {
+    key: "agentBridgeExactCompletionMarker",
+    label: "Agent bridge logs an exact current-run completion marker",
+    marker: "codex patch rc.7.7: Agent bridge exact completion marker",
+  },
+  {
+    key: "transportSuccessWaitsForExactMarker",
+    label: "successful background transport settlement stays busy until exact completion",
+    marker: "codex patch rc.7.10.21: transport success waits for exact marker",
+  },
+  {
+    key: "authoritativeSessionLogMarkerFallback",
+    label: "authoritative session-log completion starts bounded per-run convergence",
+    marker: "codex patch rc.7.10.22: authoritative session log marker fallback",
+  },
+  {
+    key: "unsettledTransportExactMarkerRelease",
+    label: "authoritative exact marker is discovered while a transport callback is stalled",
+    marker: "codex patch rc.7.10.23: authoritative exact marker releases unsettled transport",
+  },
+  {
+    key: "exactMarkerTransportSettlement",
+    label: "authoritative exact marker settles the matching missing task_done before READY",
+    marker: "codex patch rc.7.10.24: exact marker settles missing task_done",
+  },
+  {
+    key: "humanFileExactCompletionMarker",
+    label: "Manual Run File logs an exact current-run completion marker",
+    marker: "codex patch rc.7: human file exact completion marker",
+  },
+  {
+    key: "terminalInputSharedLifecycle",
+    label: "Terminal input owns the shared execution lifecycle",
+    marker: "codex patch rc.7: Terminal input owns shared lifecycle",
+  },
+  {
+    key: "terminalInputExactCompletionMarker",
+    label: "Terminal input logs an exact current-run completion marker",
+    marker: "codex patch rc.7: Terminal input exact completion marker",
+  },
+  {
+    key: "terminalInputVerifiedLifecycleRelease",
+    label: "Terminal input releases through exact lifecycle evidence",
+    marker: "codex patch rc.7: Terminal input verified lifecycle release",
+  },
+  {
+    key: "quietGraphInventoryProbes",
+    label: "internal graph inventory probes suppress stale Graph-window noise",
+    marker: "codex patch rc.7: graph inventory probes are quiet",
+  },
+  {
+    key: "dataBrowserObservableReadiness",
+    label: "Data Browser exposes dataset and Arrow readiness diagnostics",
+    marker: "codex patch rc.7: Data Browser observable readiness",
+  },
+  {
+    key: "graphRouteLoadDiagnosticsDistinct",
+    label: "graph diagnostics distinguish routed and loaded artifact paths",
+    marker: "codex patch rc.7: routed and loaded graph paths are distinct",
+  },
+  {
+    key: "manifestCannotReleaseExecution",
+    label: "inline graph manifests cannot release an executing Stata run",
+    marker: "codex patch rc.7: manifest cannot release execution",
+  },
+  {
+    key: "graphMarkerProgressOnly",
+    label: "graph routing markers cannot release an executing Stata run",
+    marker: "codex patch rc.7: graph marker is progress only",
+  },
+  {
+    key: "manualSelectionRejectsGraphOnlyCompletion",
+    label: "Manual Selection rejects graph-only completion evidence",
+    marker: "codex patch rc.7: manual selection rejects graph-only completion",
+  },
+  {
+    key: "humanFileRejectsGraphOnlyCompletion",
+    label: "Manual Run File rejects graph-only completion evidence",
+    marker: "codex patch rc.7: human file rejects graph-only completion",
+  },
+  {
+    key: "debugSelectionRequiresLifecycle",
+    label: "Manual Selection diagnostics require verified lifecycle completion",
+    marker: "codex patch rc.7: debug selection requires lifecycle completion",
+  },
+  {
+    key: "debugFileRequiresLifecycle",
+    label: "Manual Run File diagnostics require verified lifecycle completion",
+    marker: "codex patch rc.7: debug file requires lifecycle completion",
+  },
+  {
+    key: "visibleBridgeExecutedCompletion",
+    label: "visible bridge ignores prepared graph completion markers",
+    marker: "codex patch rc.6.4.1: visible bridge waits for executed completion",
+  },
+  {
+    key: "restoredTerminalRebasesResources",
+    label: "restored terminal rebases current webview resources",
+    marker: "codex patch rc.6.4.2: restored terminal rebases current webview resources",
+  },
+  {
+    key: "terminalInlineScriptParseGate",
+    label: "terminal inline script syntax and nonce repair",
+    marker: "codex patch rc.6.4.3: terminal inline script parse gate",
+  },
+  {
+    key: "terminalSmclFallbackV2",
+    label: "terminal fallback preserves readable SMCL when shared UI fails",
+    marker: "codex-smcl-fallback-v2-template-safe",
   },
   {
     key: "singleFlightState",
@@ -98,9 +331,19 @@ const REQUIRED_MARKERS = [
     marker: "codex patch v4: status endpoint",
   },
   {
+    key: "recoveryStatusPayload",
+    label: "/status exposes public recovery and backend ownership state",
+    marker: "recovery:__codexControl.publicRecovery(globalThis.__codexRecoveryState),backendOwnerId:",
+  },
+  {
+    key: "dedicatedRecoveryEndpoint",
+    label: "dedicated verified recovery endpoint",
+    marker: "codex patch rc.6.4: dedicated verified recovery endpoint",
+  },
+  {
     key: "busy409",
-    label: "busy requests return HTTP 409",
-    marker: "codex patch v4: busy 409",
+    label: "busy requests use structured HTTP 409 rejection",
+    marker: 'let __busy=o=>__reject(o,{kind:"busy",httpStatus:409',
   },
   {
     key: "forceResetStateCleanup",
@@ -114,8 +357,8 @@ const REQUIRED_MARKERS = [
   },
   {
     key: "forceResetV6Cleanup",
-    label: "force reset cleans orphan mcp-stata helpers",
-    marker: "codex patch v6: cleanup orphan mcp-stata processes",
+    label: "force reset cleans only extension-owned backend PIDs",
+    marker: "codex patch rc.6.4: cleanup only backend PIDs owned by this extension host",
   },
   {
     key: "separateGraphViewerPanel",
@@ -148,9 +391,19 @@ const REQUIRED_MARKERS = [
     marker: "codex patch v7.2: graph clear endpoint",
   },
   {
-    key: "graphClearReleasesPostRunBusy",
-    label: "graph clear releases stale postRunBusy",
-    marker: '__codexSetPostRunBusy&&globalThis.__codexSetPostRunBusy(false,"graph-clear-complete",null)',
+    key: "graphClearUiOnly",
+    label: "graph clear does not mutate execution readiness",
+    marker: "codex patch rc.6.4: graph clear is UI-only",
+  },
+  {
+    key: "graphClearHelperPreservesReadiness",
+    label: "graph panel Clear All preserves execution readiness",
+    marker: "codex patch rc.6.4: graph panel clear preserves execution readiness",
+  },
+  {
+    key: "graphClearHydratePreservesReadiness",
+    label: "clear-snapshot hydration cannot release execution readiness",
+    marker: "codex patch rc.6.4: clear snapshot hydration cannot release readiness",
   },
   {
     key: "graphViewerPanelId",
@@ -186,6 +439,22 @@ const REQUIRED_MARKERS = [
     key: "sourceRewriteDisabledDiagnostic",
     label: "graph status reports source rewriting policy",
     marker: "sourceRewriteDisabled: true",
+  },
+  {
+    key: "sharedSourceCompatibilityAdapter",
+    label: "Manual, Agent, and Terminal share Darwin source-path compatibility",
+    marker: "codex patch rc.7: shared source compatibility adapter",
+  },
+  {
+    key: "sharedExecutionPaginationGuard",
+    label: "Manual, Agent, and Terminal disable interactive Stata pagination",
+    marker: "codex patch rc.7.10.16: shared adapter disables Stata pagination",
+  },
+  {
+    key: "sharedTransportLogProtection",
+    label: "all visible execution paths preserve the live Stata transport log",
+    relativePath: path.join("scripts", "stata_source_compat_core.js"),
+    marker: "codex patch rc.7.10.33: every visible entry point preserves the live transport log",
   },
   {
     key: "scopedManualSelectionSnapshot",
@@ -298,14 +567,49 @@ const REQUIRED_MARKERS = [
     marker: "hardStallAfterMs:(__codexManualSelectionLongRun?14400000:120000)",
   },
   {
+    key: "visibleBridgeStructuralLongRunWatchdog",
+    label: "visible bridge gives structurally long do-files a bounded extended watchdog",
+    marker: "codex patch rc.7.10.35: structural long bridge watchdog",
+  },
+  {
+    key: "visibleBridgePreRunDatasetSnapshot",
+    label: "visible Agent bridge snapshots the shared dataset before interruptible execution",
+    marker: "codex patch rc.7.10.36: visible bridge snapshots pre-run dataset",
+  },
+  {
+    key: "visibleBridgeActiveSnapshotOwnership",
+    label: "soft Stop resolves the canonical active Agent pre-run snapshot",
+    marker: "codex patch rc.7.10.37: Stop resolves the active Agent snapshot",
+  },
+  {
+    key: "visibleBridgeStopSnapshotCleanupOwnership",
+    label: "cancelled Agent handlers preserve the snapshot until soft Stop restores it",
+    marker: "codex patch rc.7.10.38: Stop owns Agent snapshot cleanup",
+  },
+  {
+    key: "softStopServerTaskDrain",
+    label: "soft Stop waits for server task cancellation before restoring shared state",
+    marker: "codex patch rc.7.10.39: server task drain before snapshot restore",
+  },
+  {
+    key: "softStopCancelledTaskDoneDrain",
+    label: "cancelled Agent tasks retain task_done until Stop restores shared state",
+    marker: "codex patch rc.7.10.40: cancelled task_done drains before restore",
+  },
+  {
+    key: "softStopFullStateCheckpoint",
+    label: "Stop checkpoints and restores dataset, globals, estimates, and named graphs",
+    marker: "codex patch rc.7.10.41: full Stop checkpoint",
+  },
+  {
     key: "manualSelectionLongRunWatchdog",
     label: "MI/document/large manual selections use long-run watchdog",
     marker: "codex patch v7.40: MI/document/large manual selections use long-run watchdog",
   },
   {
     key: "manualSelectionGraphCompletionMarker",
-    label: "manual-selection watchdog accepts graph completion marker",
-    marker: "codex patch v7.40: manual-selection watchdog accepts graph completion marker",
+    label: "manual-selection watchdog treats graph markers as progress only",
+    marker: "codex patch rc.7: graph marker is progress only",
   },
   {
     key: "humanFileDocumentHardStallBound",
@@ -364,18 +668,18 @@ const REQUIRED_MARKERS = [
   },
   {
     key: "longHumanNoGraphMarkerRelease",
-    label: "long human-file/selection does not release on graph marker alone",
-    marker: "codex patch v7.55: long human runs do not release on graph marker alone",
+    label: "graph-only release branches are explicitly disabled",
+    marker: "codex patch rc.7: graph-only release branches disabled",
   },
   {
     key: "longHumanIgnoreCodexMarkerEcho",
-    label: "long human-file/selection ignores CODEX marker echoes",
-    marker: "codex patch v7.55b: long human runs ignore CODEX marker echoes",
+    label: "watchdog delegates completion parsing to the canonical run lifecycle",
+    marker: "inspectLogText(text,runId)",
   },
   {
     key: "noGraphHumanIgnoreGraphMarker",
-    label: "no-graph human-file/selection ignores graph completion marker",
-    marker: "codex patch v7.55c: no-graph human runs ignore graph completion marker",
+    label: "watchdog requires exact current-run completion evidence",
+    marker: "__inspection.completionMarkerVerified",
   },
   {
     key: "longHumanStaleEvidenceWindows",
@@ -429,13 +733,13 @@ const REQUIRED_MARKERS = [
   },
   {
     key: "manualSelectionCompletionMarkerHardStallRelease",
-    label: "manual selected-code hard-stall accepts current completion marker",
-    marker: "codex patch v7.66: manual-selection hard-stall releases cleanly when current completion marker exists",
+    label: "manual selected-code hard-stall rejects graph-only completion",
+    marker: "codex patch rc.7: graph marker cannot hard-stall release",
   },
   {
     key: "manualSelectionCompletionMarkerPreLogRelease",
-    label: "manual selected-code pre-log watchdog accepts current completion marker",
-    marker: "codex patch v7.67: manual-selection pre-log watchdog accepts current completion marker",
+    label: "manual selected-code pre-log watchdog rejects graph-only completion",
+    marker: "codex patch rc.7: graph marker cannot pre-log release",
   },
   {
     key: "longGraphDocumentRunFileOptOut",
@@ -514,13 +818,38 @@ const REQUIRED_MARKERS = [
   },
   {
     key: "bridgeAcquireRecoverySmoke",
-    label: "bridge acquire permits recovery smoke after panic",
-    marker: "v7.24n: bridge acquire permits recovery smoke after panic",
+    label: "bridge acquire permits only the current internal recovery generation",
+    marker: "codex patch rc.6.4: only current internal recovery generation may bypass stale",
   },
   {
     key: "bridgeAcquireRecoverySmokeReason",
     label: "bridge recovery smoke acquire reads true READY reason",
     marker: "__codexAcquireStatus=s.busy",
+  },
+  {
+    key: "terminalRecoveryGuard",
+    label: "terminal execution rejects ordinary code during recovery",
+    marker: 'controlPlaneRejected:true,httpStatus:423,reasonCode:"recovery-required"',
+  },
+  {
+    key: "terminalNoGraphReadinessRefresh",
+    label: "successful no-graph terminal runs refresh readiness runId",
+    marker: "codex patch rc.6.4: successful no-graph terminal run refreshes readiness runId",
+  },
+  {
+    key: "recoveryReadinessPrecedence",
+    label: "recovery-required precedes graph readiness",
+    marker: "codex patch rc.6.4: recovery gate precedes graph readiness",
+  },
+  {
+    key: "platformPanicAdapter",
+    label: "panic recovery uses a platform adapter",
+    marker: "codex patch rc.6.4: platform panic adapter",
+  },
+  {
+    key: "windowsPanicRecoveryState",
+    label: "Windows panic command enters the shared recovery control plane",
+    marker: "codex patch rc.6.4: Windows panic command enters recovery control plane",
   },
   {
     key: "statusBarTrueReady",
@@ -824,8 +1153,8 @@ const REQUIRED_MARKERS = [
   },
   {
     key: "humanFileDebugStaleDetection",
-    label: "debug-run-file reports human-file watchdog stale as failure",
-    marker: "human-file watchdog reported stale state",
+    label: "debug-run-file reports any unverified human-file lifecycle as failure",
+    marker: "human-file execution did not reach verified lifecycle completion",
   },
   {
     key: "forceResetNeedsSmokeAfterPrelog",
@@ -850,7 +1179,7 @@ const REQUIRED_MARKERS = [
   {
     key: "humanFileInlineSnapshotMoreOff",
     label: "human Run File inline snapshot temp do disables Stata pagination",
-    marker: "set more off\\n\" + graphPrepared.code",
+    marker: 'const intended = "set more off\\n" + __codexBodyCode',
   },
   {
     key: "humanFileRecycleSettle",
@@ -859,8 +1188,13 @@ const REQUIRED_MARKERS = [
   },
   {
     key: "humanFileInlineSnapshotGraphicsOff",
-    label: "human Run File inline snapshot preserves native graphics state",
-    marker: "human-file inline snapshots keep native graphics state to preserve live worker",
+    label: "Darwin PNG compatibility rewrites only the temporary run copy",
+    marker: "A3/rc.6.3.1 PNG_COMPAT: Darwin-only temp-copy rewrite of raster graph export",
+  },
+  {
+    key: "darwinHugeHumanFilePngCompat",
+    label: "huge human-file source-selection also uses Darwin PNG compatibility",
+    marker: "codex patch rc.7: huge human file applies Darwin PNG compatibility",
   },
   {
     key: "humanFileDocumentHardStallWindow",
@@ -909,8 +1243,8 @@ const REQUIRED_MARKERS = [
   },
   {
     key: "humanFileExplicitGraphExportKeepsGraphicsOn",
-    label: "human Run File inline snapshots never toggle native graphics state",
-    marker: "codex patch v7.29: human-file inline snapshots keep native graphics state to preserve live worker",
+    label: "human-file inline snapshots exclude retained graph sweep from live do",
+    marker: "codex patch v7.29d: human-file inline snapshot excludes retained graph sweep from live do to preserve worker",
   },
   {
     key: "humanFilePreflightAfterInlineSnapshot",
@@ -1048,6 +1382,11 @@ const REQUIRED_MARKERS = [
     marker: "codex patch v7.40: debug-run-selection supports range/all selection",
   },
   {
+    key: "debugRunSelectionDiskRefresh",
+    label: "debug Run Selection refreshes from disk and restores a clean editor buffer",
+    marker: "codex patch rc.7: debug selection refreshes and restores disk buffer",
+  },
+  {
     key: "terminalInputStoppedSessionRetry",
     label: "terminal input recovers stopped default session once",
     marker: "terminal-input stopped-session auto-recovery",
@@ -1078,6 +1417,31 @@ const REQUIRED_MARKERS = [
     marker: "terminal input skips dataset refresh to preserve shared memory",
   },
   {
+    key: "terminalInputDataBrowserCommand",
+    label: "bare Terminal browse/edit opens the Workbench Data Browser after lifecycle release",
+    marker: "codex patch rc.7.10.10: Terminal browse opens Data Browser",
+  },
+  {
+    key: "dataBrowserChannelRecovery",
+    label: "reused Data Browser panels reacquire credentials and retry dataset initialization twice",
+    marker: "codex patch rc.7.10.11: Data Browser channel recovery",
+  },
+  {
+    key: "dataBrowserExactReadiness",
+    label: "Data Browser readiness requires non-null dataset and completed Arrow evidence",
+    marker: "codex patch rc.7.10.12: exact Data Browser readiness",
+  },
+  {
+    key: "dataBrowserFreshCommandCompletion",
+    label: "View Data awaits channel refresh and rejects stale readiness from a prior command",
+    marker: "codex patch rc.7.10.13: fresh Data Browser command completion",
+  },
+  {
+    key: "dataBrowserVariableIntegrity",
+    label: "Data Browser requires real variables and records selected variable evidence",
+    marker: "codex patch rc.7.10.14: Data Browser variable integrity",
+  },
+  {
     key: "graphPdfDownloadBaseDir",
     label: "graph PDF download preserves artifact baseDir",
     marker: "baseDir: activeModalArtifact.baseDir",
@@ -1086,65 +1450,347 @@ const REQUIRED_MARKERS = [
 
 const AUXILIARY_MARKERS = [
   {
+    key: "stopCheckpointCore",
+    label: "packaged Stop checkpoint module preserves full shared Stata state",
+    relativePath: path.join("scripts", "stop_checkpoint_core.js"),
+    marker: "function checkpointCode",
+  },
+  {
+    key: "executionLifecycleCore",
+    label: "shared execution lifecycle resolves authoritative log directories",
+    relativePath: path.join("scripts", "execution_lifecycle_core.js"),
+    marker: "function resolveLogDirectories",
+  },
+  {
+    key: "executionLifecycleStableIdentity",
+    label: "shared execution lifecycle preserves object identity through release",
+    relativePath: path.join("scripts", "execution_lifecycle_core.js"),
+    marker: "Object.assign(current",
+  },
+  {
+    key: "terminalUiCommandAdapter",
+    label: "packaged Terminal UI command adapter classifies only exact browse/edit commands",
+    relativePath: path.join("scripts", "terminal_ui_command.js"),
+    marker: "function classifyTerminalUiCommand",
+  },
+  {
+    key: "controlPlaneCore",
+    label: "shared control-plane core verifies recovery attempts",
+    relativePath: path.join("scripts", "control_plane_core.js"),
+    marker: "function verifyRecoveryAttempt",
+  },
+  {
+    key: "darwinOwnedPidCleanup",
+    label: "Darwin force cleanup requires explicit owned PIDs",
+    relativePath: path.join("scripts", "mac", "cleanup.sh"),
+    marker: "--force 必须至少提供一个由当前扩展宿主登记的 --pid",
+  },
+  {
+    key: "windowsOwnedPidCleanup",
+    label: "Windows force cleanup requires explicit owned PIDs",
+    relativePath: path.join("scripts", "cleanup_mcp_stata_processes.ps1"),
+    marker: "-Force requires -OwnedPidCsv",
+  },
+  {
     key: "autocompleteEmptyVarsNoRefreshLoop",
     label: "autocomplete empty-variable update does not requestVars loop",
     relativePath: path.join("src", "ui-shared", "autocomplete.js"),
     marker: "if (!vars.length) { close(); return; }",
   },
   {
+    key: "terminalSharedUiLoadProbeSource",
+    label: "source shared terminal UI exposes an external-script load probe",
+    relativePath: path.join("src", "ui-shared", "main.js"),
+    marker: "window.__stataWorkbenchSharedUiLoaded = true;",
+  },
+  {
+    key: "terminalSharedUiLoadProbeDist",
+    label: "packaged shared terminal UI exposes an external-script load probe",
+    relativePath: path.join("dist", "ui-shared", "main.js"),
+    marker: "window.__stataWorkbenchSharedUiLoaded = true;",
+  },
+  {
+    key: "terminalBrowserSafeReleaseSource",
+    label: "source terminal webview uses browser-safe release globals",
+    relativePath: path.join("src", "ui-shared", "main.js"),
+    marker: "globalThis.__SENTRY_RELEASE__",
+  },
+  {
+    key: "terminalBrowserSafeReleaseDist",
+    label: "packaged terminal webview uses browser-safe release globals",
+    relativePath: path.join("dist", "ui-shared", "main.js"),
+    marker: "globalThis.__SENTRY_RELEASE__",
+  },
+  {
+    key: "dataBrowserBrowserSafeReleaseSource",
+    label: "source Data Browser uses browser-safe release globals",
+    relativePath: path.join("src", "ui-shared", "data-browser.js"),
+    marker: "globalThis.__SENTRY_RELEASE__",
+  },
+  {
+    key: "dataBrowserBrowserSafeReleaseDist",
+    label: "packaged Data Browser uses browser-safe release globals",
+    relativePath: path.join("dist", "ui-shared", "data-browser.js"),
+    marker: "globalThis.__SENTRY_RELEASE__",
+  },
+  {
     key: "dataBrowserStataMissingValue",
     label: "Data Browser renders Stata numeric missing values as dot",
     relativePath: path.join("src", "ui-shared", "data-browser.js"),
     marker: "STATA_MISSING_VALUE = 8.98846567431158e+307",
+    optional: true,
   },
   {
-    key: "runtimeOwnerLoopRecorded",
-    label: "mcp-stata records the MCP owner event loop",
-    base: "workspace",
-    relativePath: path.join("stata-mcp-py311", "Lib", "site-packages", "mcp_stata", "sessions.py"),
-    marker: "self._loop: Optional[asyncio.AbstractEventLoop] = None",
+    key: "runtimePatchTargetsListenerLoop",
+    label: "packaged mcp-stata patch targets the live listener loop",
+    relativePath: path.join("scripts", "mcp_stata_runtime_patch.js"),
+    marker: "listener_task.get_loop()",
   },
   {
-    key: "runtimeRejectsListenerLoopTheft",
-    label: "mcp-stata rejects non-owner listener loop theft",
-    base: "workspace",
-    relativePath: path.join("stata-mcp-py311", "Lib", "site-packages", "mcp_stata", "sessions.py"),
-    marker: "dispatch must be marshalled to the MCP owner loop",
+    key: "runtimePatchUsesRunCoroutineThreadsafe",
+    label: "packaged Data Browser calls use run_coroutine_threadsafe",
+    relativePath: path.join("scripts", "mcp_stata_runtime_patch.js"),
+    marker: "asyncio.run_coroutine_threadsafe(_run(), listener_loop)",
   },
   {
-    key: "runtimeMissingWorkerConnIsStopped",
-    label: "missing worker connection is treated as stopped before dispatch",
-    base: "workspace",
-    relativePath: path.join("stata-mcp-py311", "Lib", "site-packages", "mcp_stata", "sessions.py"),
-    marker: "worker connection is unavailable",
+    key: "runtimePatchBoundsLogNotifications",
+    label: "packaged mcp-stata patch writes full logs before timeout-bounded notifications",
+    relativePath: path.join("scripts", "mcp_stata_runtime_patch.js"),
+    marker: "Workbench log_path must never wait indefinitely for MCP notifications",
   },
   {
-    key: "runtimeStartupRemovalIsStopped",
-    label: "startup race removal is treated as stopped before dispatch",
-    base: "workspace",
-    relativePath: path.join("stata-mcp-py311", "Lib", "site-packages", "mcp_stata", "sessions.py"),
-    marker: "session was removed during startup",
+    key: "runtimePatchCapsNotificationBatch",
+    label: "packaged mcp-stata patch caps the cumulative run notification budget",
+    relativePath: path.join("scripts", "mcp_stata_runtime_patch.js"),
+    marker: "notify_budget_remaining = 4000",
   },
   {
-    key: "runtimeRecoverStoppedLiveListener",
-    label: "mcp-stata recovers stopped listener without replacing live worker",
-    base: "workspace",
-    relativePath: path.join("stata-mcp-py311", "Lib", "site-packages", "mcp_stata", "sessions.py"),
-    marker: "Recovering stopped listener for live Stata session",
+    key: "runtimePatchPreservesPythonStringEscapes",
+    label: "packaged mcp-stata patch preserves valid Python notification strings",
+    relativePath: path.join("scripts", "mcp_stata_runtime_patch.js"),
+    marker: "Workbench notification budget must preserve valid Python source",
   },
   {
-    key: "runtimeMarshalsUiCalls",
-    label: "UI/DataBrowser calls marshal to the MCP owner loop",
-    base: "workspace",
-    relativePath: path.join("stata-mcp-py311", "Lib", "site-packages", "mcp_stata", "server.py"),
-    marker: "UI/DataBrowser HTTP threads must not",
+    key: "runtimePatchTimesOutNotificationBackpressure",
+    label: "packaged mcp-stata patch times out notification backpressure",
+    relativePath: path.join("scripts", "mcp_stata_runtime_patch.js"),
+    marker: "timeout=0.25",
   },
   {
-    key: "runtimeUsesRunCoroutineThreadsafe",
-    label: "cross-thread runtime calls use run_coroutine_threadsafe",
-    base: "workspace",
-    relativePath: path.join("stata-mcp-py311", "Lib", "site-packages", "mcp_stata", "server.py"),
-    marker: "asyncio.run_coroutine_threadsafe(",
+    key: "runtimePatchBoundsTaskDoneNotification",
+    label: "packaged mcp-stata patch prevents task_done from retaining the transport",
+    relativePath: path.join("scripts", "mcp_stata_runtime_patch.js"),
+    marker: "Workbench task_done notification must not retain the MCP transport",
+  },
+  {
+    key: "runtimePatchDrainsWorkerFutureBeforeTaskDone",
+    label: "packaged mcp-stata patch keeps cancellation non-terminal until the worker acknowledges",
+    relativePath: path.join("scripts", "mcp_stata_runtime_patch.js"),
+    marker: "Workbench cancellation must drain the live worker future before task_done",
+  },
+  {
+    key: "runtimePatchUsesSupportedStataBreakApi",
+    label: "packaged mcp-stata patch interrupts Stata through the supported PyStata ABI",
+    relativePath: path.join("scripts", "mcp_stata_runtime_patch.js"),
+    marker: "Workbench cancellation uses StataSO_SetBreak",
+  },
+  {
+    key: "runtimePatchDrainsPerRunTail",
+    label: "packaged mcp-stata patch drains the per-run log through its standalone completion marker",
+    relativePath: path.join("scripts", "mcp_stata_runtime_patch.js"),
+    marker: "Workbench per-run log must contain its own completion marker before task_done.",
+  },
+  {
+    key: "perRunCompletionFailsClosed",
+    label: "rc.7.25 refuses session-only success when the per-run log never converges",
+    relativePath: path.join("dist", "extension.js"),
+    marker: "codex patch rc.7.25: per-run log completion is fail-closed",
+  },
+  {
+    key: "dynamicProgressLongRunPolicy",
+    label: "rc.7.26 uses scope-valid dynamic long-run classification at every visible PROGRESS wrapper",
+    relativePath: path.join("dist", "extension.js"),
+    marker: "codex patch rc.7.26: progress wrappers use dynamic long-run policy",
+  },
+  {
+    key: "atomicPreRunDrainsOwningTransport",
+    label: "rc.7.27 drains the original atomic runSelection transport before pre-run release",
+    relativePath: path.join("dist", "extension.js"),
+    marker: "codex patch rc.7.27: atomic stages drain the owning transport",
+  },
+  {
+    key: "checkpointAwareSoftStopRestoreWindow",
+    label: "rc.7.28 allows bounded full-checkpoint restore time before hard escalation",
+    relativePath: path.join("dist", "extension.js"),
+    marker: "codex patch rc.7.28: checkpoint-aware soft Stop restore window",
+  },
+  {
+    key: "trueTransportSettlementBeforeStopRestore",
+    label: "rc.7.30 requires server, promise, and local ownership settlement before Stop restore",
+    relativePath: path.join("dist", "extension.js"),
+    marker: "codex patch rc.7.30: Stop requires true transport settlement",
+  },
+  {
+    key: "runtimePatchDrainsGraphCache",
+    label: "packaged mcp-stata patch drains graph cache before task_done",
+    relativePath: path.join("scripts", "mcp_stata_runtime_patch.js"),
+    marker: "Workbench graph cache must drain before task_done",
+  },
+  {
+    key: "runtimePatchRespectsGraphReadyRequest",
+    label: "packaged mcp-stata patch honors no-graph background requests",
+    relativePath: path.join("scripts", "mcp_stata_runtime_patch.js"),
+    marker: "Workbench background tools must honor the client's graph-ready request",
+  },
+  {
+    key: "runtimePatchQuietsGraphInventory",
+    label: "packaged mcp-stata patch keeps internal no-graph inventory probes quiet",
+    relativePath: path.join("scripts", "mcp_stata_runtime_patch.js"),
+    marker: "Workbench internal graph inventory probes must be quiet",
+  },
+  {
+    key: "runtimePatchQuietsInternalGraphFallbacks",
+    label: "packaged mcp-stata patch keeps internal graph fallbacks out of visible logs",
+    relativePath: path.join("scripts", "mcp_stata_runtime_patch.js"),
+    marker: "Workbench internal no-capture commands must stay out of the visible log",
+  },
+  {
+    key: "runtimePatchRejectsUnknownUpstream",
+    label: "mcp-stata runtime patch rejects unsupported source shapes",
+    relativePath: path.join("scripts", "mcp_stata_runtime_patch.js"),
+    marker: 'status: "unsupported-source"',
+  },
+  {
+    key: "runtimePatchResolvesPinnedUvxRoot",
+    label: "packaged mcp-stata patch resolves the pinned uvx sys.prefix",
+    relativePath: path.join("scripts", "mcp_stata_runtime_patch.js"),
+    marker: "runtimeRootFromUvCommand(options.uvCommand, options)",
+  },
+  {
+    key: "runtimePatchSupportsDynamicPythonSitePackages",
+    label: "packaged mcp-stata patch supports dynamic Python site-package versions",
+    relativePath: path.join("scripts", "mcp_stata_runtime_patch.js"),
+    marker: 'if (/^python\\d+(?:\\.\\d+)*$/i.test(name))',
+  },
+  {
+    key: "runtimePatchPrefersConfiguredFixedRuntime",
+    label: "configured and fixed mcp-stata runtimes precede disposable uv caches",
+    relativePath: path.join("scripts", "mcp_stata_runtime_patch.js"),
+    marker: "Workbench runtime precedence: configured/fixed installs before disposable uv caches.",
+  },
+  {
+    key: "runtimePatchCompilesBeforeWrite",
+    label: "all patched Python modules compile before any runtime write",
+    relativePath: path.join("scripts", "mcp_stata_runtime_patch.js"),
+    marker: "Compile every candidate module before any runtime byte is replaced.",
+  },
+  {
+    key: "runtimePatchWritesTransactionally",
+    label: "runtime patch failures restore every original Python byte",
+    relativePath: path.join("scripts", "mcp_stata_runtime_patch.js"),
+    marker: "Runtime patch writes are one transaction: any failure restores every original byte.",
+  },
+  {
+    key: "configuredRuntimePatchFailClosedRelease",
+    label: "rc.7.22 identifies configured-runtime fail-closed activation",
+    relativePath: path.join("dist", "extension.js"),
+    marker: "codex patch rc.7.22: configured runtime patch is fail-closed",
+  },
+  {
+    key: "emptySessionCheckpointRelease",
+    label: "rc.7.23 preserves an empty pre-run session with an exact checkpoint milestone",
+    relativePath: path.join("dist", "extension.js"),
+    marker: "codex patch rc.7.23: empty-session checkpoint is restore-capable",
+  },
+  {
+    key: "byteStableCheckpointMarkerRelease",
+    label: "rc.7.24 writes checkpoint delimiters with Stata byte-stable tab tokens",
+    relativePath: path.join("dist", "extension.js"),
+    marker: "codex patch rc.7.24: checkpoint marker uses byte-stable Stata tabs",
+  },
+  {
+    key: "runtimePatchWiredBeforeConnect",
+    label: "extension applies the Data Browser runtime patch before MCP connect",
+    relativePath: path.join("dist", "extension.js"),
+    marker: "codex patch rc.7: mcp-stata Data Browser listener-loop patch",
+  },
+  {
+    key: "runtimePatchWiredToLiveUvx",
+    label: "extension patches the live uvx runtime before MCP connect",
+    relativePath: path.join("dist", "extension.js"),
+    marker: "codex patch rc.7.10.27: patch live uvx runtime",
+  },
+  {
+    key: "internalGraphProbesAreQuiet",
+    label: "internal graph inventory and snapshot probes do not leak no-graph errors",
+    relativePath: path.join("dist", "extension.js"),
+    marker: "codex patch rc.7.10.29: internal graph probes are quiet",
+  },
+  {
+    key: "sharedDarwinDocumentCompatibility",
+    label: "all visible execution paths share the Darwin document-image compatibility adapter",
+    relativePath: path.join("dist", "extension.js"),
+    marker: "codex patch rc.7.2: shared Darwin graph/document compatibility",
+  },
+  {
+    key: "sharedDarwinReferencedDoCompatibility",
+    label: "referenced do-file temporary copies use the shared Darwin compatibility adapter",
+    relativePath: path.join("dist", "extension.js"),
+    marker: "codex patch rc.7.3: referenced do-files use Darwin compatibility",
+  },
+  {
+    key: "runScopedLifecycleCallbacks",
+    label: "late callbacks are scoped to their owning execution run",
+    relativePath: path.join("dist", "extension.js"),
+    marker: "codex patch rc.7.4: lifecycle callbacks are run-scoped",
+  },
+  {
+    key: "lifecycleCoreChecksCallbackOwnership",
+    label: "shared lifecycle core rejects callbacks from previous runs",
+    relativePath: path.join("scripts", "execution_lifecycle_core.js"),
+    marker: "ownsLifecycle",
+  },
+  {
+    key: "darwinCompatibilityAdapterModule",
+    label: "packaged Darwin adapter transforms direct and referenced execution code",
+    relativePath: path.join("scripts", "darwin_compat_adapter.js"),
+    marker: "transformReferencedCode",
+  },
+  {
+    key: "darwinPngOpaqueRgbHelper",
+    label: "Darwin PNG compatibility includes lossless RGBA-to-RGB conversion",
+    relativePath: path.join("scripts", "mac", "png_opaque_rgb.rb"),
+    marker: 'rgb_ihdr = [width, height, 8, 2, 0, 0, 0]',
+  },
+  {
+    key: "darwinPngRequiresRgb",
+    label: "Darwin PNG helper rejects putdocx-unsafe alpha output",
+    relativePath: path.join("scripts", "mac", "png_compat_sips.sh"),
+    marker: 'fail "png_not_rgb:color_type=$COLOR_TYPE"',
+  },
+  {
+    key: "darwinPngSilentSuccess",
+    label: "Darwin PNG helper cannot fill Stata shell pipes with success output",
+    relativePath: path.join("scripts", "mac", "png_compat_sips.sh"),
+    marker: "codex patch rc.7.10.19: Stata/PyStata may not drain repeated shell output",
+  },
+  {
+    key: "darwinDocxImageInjector",
+    label: "Darwin document images are injected after save outside embedded PyStata",
+    relativePath: path.join("scripts", "mac", "docx_image_inject.py"),
+    marker: "DOCX_IMAGE_COMPAT_MARKER_REMAINED",
+  },
+  {
+    key: "darwinDocxSilentSuccess",
+    label: "Darwin DOCX helper cannot fill Stata shell pipes with success output",
+    relativePath: path.join("scripts", "mac", "docx_image_inject.py"),
+    marker: "codex patch rc.7.10.20: Stata/PyStata may not drain repeated shell",
+  },
+  {
+    key: "darwinDocxTempCopyTransform",
+    label: "Darwin temporary execution copies replace putdocx image with markers",
+    relativePath: path.join("scripts", "mac", "png_compat_transform.js"),
+    marker: "DOCX_IMAGE_COMPAT_DARWIN",
   },
 ];
 
@@ -1160,19 +1806,39 @@ const FORBIDDEN_MARKERS = [
   { key: "noRefreshFlag", label: "no --refresh flag", marker: "--refresh" },
   { key: "noRefreshPackage", label: "no refresh-package flag", marker: "refresh-package" },
   { key: "noLatestSpec", label: "no mcp-stata@latest", marker: "mcp-stata@latest" },
+  { key: "noLabelRecoveryBypass", label: "no label/code-regex recovery bypass", marker: "let __codexAllowRecoverySmoke=" },
+  { key: "noGraphClearBusyRelease", label: "graph-clear cannot release postRunBusy", marker: '__codexSetPostRunBusy&&globalThis.__codexSetPostRunBusy(false,"graph-clear-complete"' },
+  { key: "noGraphClearReadyWrite", label: "graph-clear cannot mark readiness ready", marker: 'readinessReason:"graph-clear-complete"' },
 ];
 
 function findExtension() {
+  if (TARGET_REPO) {
+    const pkg = path.join(WORKSPACE, "package.json");
+    const packageJson = JSON.parse(fs.readFileSync(pkg, "utf8"));
+    return {
+      name: `${packageJson.publisher}.${packageJson.name}-repo`,
+      full: WORKSPACE,
+      js: PATCHED_BASELINE,
+      pkg,
+      version: packageJson.version,
+      mtime: fs.statSync(PATCHED_BASELINE).mtimeMs,
+      target: "repo",
+    };
+  }
   if (!fs.existsSync(EXT_ROOT)) {
     fail(`VS Code extension root not found: ${EXT_ROOT}`);
   }
+  // codex patch v8.01: publisher-agnostic extension discovery (tmonk.* and lzhs1995.*)
+  // Cross-platform shared-session packaging may ship as either publisher id.
   const candidates = fs.readdirSync(EXT_ROOT)
-    .filter((name) => name.startsWith(EXTENSION_ID_PREFIX))
+    .filter((name) => name.startsWith(EXTENSION_ID_PREFIX) || /^[^.]+\.stata-workbench-/.test(name))
     .map((name) => {
       const full = path.join(EXT_ROOT, name);
       const js = path.join(full, "dist", "extension.js");
       const pkg = path.join(full, "package.json");
-      let version = name.slice(EXTENSION_ID_PREFIX.length);
+      let version = name.startsWith(EXTENSION_ID_PREFIX)
+        ? name.slice(EXTENSION_ID_PREFIX.length)
+        : name.replace(/^[^.]+\./, "");
       try {
         version = JSON.parse(fs.readFileSync(pkg, "utf8")).version || version;
       } catch {}
@@ -1262,6 +1928,10 @@ function inspectContent(content) {
 function inspectAuxiliary(extension) {
   const auxiliary = {};
   for (const item of AUXILIARY_MARKERS) {
+    if (TARGET_REPO && item.base === "workspace") {
+      auxiliary[item.key] = null;
+      continue;
+    }
     const file = path.join(item.base === "workspace" ? WORKSPACE : extension.full, item.relativePath);
     try {
       auxiliary[item.key] = fs.existsSync(file) && readText(file).includes(item.marker);
@@ -1269,7 +1939,9 @@ function inspectAuxiliary(extension) {
       auxiliary[item.key] = false;
     }
   }
-  const auxiliaryOk = Object.values(auxiliary).every(Boolean);
+  const auxiliaryOk = AUXILIARY_MARKERS.every((item) =>
+    item.optional === true || auxiliary[item.key] !== false
+  );
   return { auxiliary, auxiliaryOk };
 }
 
@@ -1355,7 +2027,9 @@ function printStatus() {
   console.log("");
   console.log("Auxiliary source checks:");
   for (const item of AUXILIARY_MARKERS) {
-    console.log(`  ${data.auxiliaryInspection.auxiliary[item.key] ? "OK  " : "MISS"} ${item.label}`);
+    const value = data.auxiliaryInspection.auxiliary[item.key];
+    const status = value === null ? "SKIP" : value ? "OK  " : item.optional ? "INFO" : "MISS";
+    console.log(`  ${status} ${item.label}`);
   }
   console.log("");
   console.log("Optional checks:");
@@ -1415,6 +2089,15 @@ function checkGraphStatusOnline() {
 
 async function cmdVerify() {
   const data = printStatus();
+  if (TARGET_REPO) {
+    console.log("");
+    console.log("Bridge    : SKIP (--target repo is a static package check)");
+    console.log("Graphs    : SKIP (--target repo is a static package check)");
+    if (!data.syntax.ok || !data.inspection.fullyPatched || !data.auxiliaryInspection.auxiliaryOk) {
+      process.exitCode = 1;
+    }
+    return;
+  }
   console.log("");
   process.stdout.write("Bridge    : checking http://127.0.0.1:17485/status ... ");
   const bridge = await checkBridgeOnline();
@@ -1543,7 +2226,9 @@ function fail(message) {
   process.exit(1);
 }
 
-const command = process.argv[2] || "status";
+const command = CLI_ARGS.find((arg, index) =>
+  !arg.startsWith("--") && CLI_ARGS[index - 1] !== "--target" && arg !== "repo"
+) || "status";
 if (command === "status") {
   printStatus();
 } else if (command === "verify") {
@@ -1553,5 +2238,5 @@ if (command === "status") {
 } else if (command === "revert") {
   cmdRevert();
 } else {
-  fail(`Unknown command: ${command}\nUsage: node patch_manager.js [status|verify|apply|revert]`);
+  fail(`Unknown command: ${command}\nUsage: node patch_manager.js [status|verify|apply|revert] [--target repo]`);
 }

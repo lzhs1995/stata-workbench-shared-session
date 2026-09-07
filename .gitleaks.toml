@@ -1,0 +1,10 @@
+title = "Stata public release scan"
+[extend]
+useDefault = true
+[[allowlists]]
+description = "Minified vendor export initialization, not an API credential"
+regexTarget = "match"
+regexes = ['''^(?:mt|Qi)\.isAttributeKey=(?:mt|Qi)\.sanitizeAttributes=void''']
+[[allowlists]]
+description = "Installed developer dependencies are not repository source"
+paths = ['''(^|/)node_modules/''']

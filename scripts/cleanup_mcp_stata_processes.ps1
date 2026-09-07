@@ -2,7 +2,8 @@
 
 param(
   [switch]$DryRun,
-  [switch]$Force
+  [switch]$Force,
+  [string]$OwnedPidCsv = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -12,6 +13,22 @@ if (-not $DryRun -and -not $Force) {
 }
 
 $currentPid = $PID
+$ownedPids = @(
+  $OwnedPidCsv -split "," |
+    ForEach-Object {
+      $parsed = 0
+      if ([int]::TryParse($_, [ref]$parsed) -and $parsed -gt 1) { $parsed }
+    }
+)
+
+if ($Force -and $ownedPids.Count -eq 0) {
+  [pscustomobject]@{
+    ok = $false
+    mode = "owned-pids"
+    error = "Refusing global cleanup: -Force requires -OwnedPidCsv."
+  } | ConvertTo-Json -Depth 4
+  exit 2
+}
 $protectedNames = @(
   "Code.exe",
   "copilot.exe",
@@ -92,6 +109,10 @@ foreach ($proc in $processes) {
   try { $path = [string]$proc.Path } catch {}
   try { $startTime = $proc.StartTime } catch {}
   $pidValue = [int]$proc.Id
+
+  if ($ownedPids.Count -gt 0 -and $pidValue -notin $ownedPids) {
+    continue
+  }
 
   if ($pidValue -eq $currentPid) {
     $skipped += [pscustomobject]@{

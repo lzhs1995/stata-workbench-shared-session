@@ -1,4 +1,9 @@
 node_modules/
+.DS_Store
+__pycache__/
+*.pyc
+*.bak-*
+.stata-receipts/
 *.vsix
 *.log
 *.smcl

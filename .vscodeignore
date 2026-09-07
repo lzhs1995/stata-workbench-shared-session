@@ -3,6 +3,12 @@
 .vscode/**
 .vscode-test/**
 node_modules/**
+tests/**
+release/**
+tools/test_*.py
+**/__pycache__/**
+**/*.pyc
+.gitleaks.toml
 *.vsix
 *.log
 *.smcl
@@ -21,7 +27,22 @@ node_modules/**
 *.zip
 *.7z
 *.bak
+*.bak-*
+**/*.bak
+**/*.bak-*
 *.backup*
+**/*.backup*
+**/.DS_Store
+.DS_Store
+# rc.7.15 R2：dist 备份 / prechange 快照类文件名（P1 审计发现）
+# 背景：上面的 *.bak / *.bak-* / *.backup* 全部**打不中**中缀形态的
+#   dist/extension.js.rc715-prechange-backup-YYYYMMDD-HHMMSS
+#   （因为文件名里没有 ".bak"/".backup" 这个后缀段，minimatch 的 * 也不跨 /）
+# 故显式补三条。注意：三条都**不会**命中正典 dist/extension.js（已用 minimatch 逐条实测），
+# 因为它们都要求 "extension.js" 之后还有一个点或含 backup/prechange 的字面量。
+**/*backup*
+**/*prechange*
+dist/extension.js.*
 7_temp/**
 **/7_temp/**
 **/4_tables/**
