@@ -1,3 +1,5 @@
+> Historical document: current public release instructions and scope are in [QUICKSTART](QUICKSTART.md), [ACCEPTANCE](ACCEPTANCE.md) and [RELEASE](RELEASE.md). Older platform/version claims below do not certify the current version.
+
 # Known Limitations
 
 - The primary supported target is Windows with VS Code or an Open VSX-compatible editor and a locally licensed Stata 18 MP installation.
