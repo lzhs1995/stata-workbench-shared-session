@@ -1,0 +1,62 @@
+{
+  "scope": "portable-tool tests and existing-session smoke, not new FULL45",
+  "verdict": "PASS",
+  "offlineTests": 18,
+  "nodeCheckCommands": 116,
+  "aiClient": {
+    "postCount": 1,
+    "retryCount": 0,
+    "checks": {
+      "http200": true,
+      "responseOk": true,
+      "requestBound": true,
+      "newRunId": true,
+      "responseRcZero": true,
+      "sameLauncher": true,
+      "sameBridgeOwner": true,
+      "sameStataBackend": true,
+      "readyAfter": true,
+      "completedRunBound": true,
+      "currentLifecycle": true,
+      "completedLifecycle": true,
+      "currentMarker": true,
+      "currentPerRunMarker": true,
+      "currentEvidenceIntact": true,
+      "completedMarker": true,
+      "completedPerRunMarker": true,
+      "completedEvidenceIntact": true
+    }
+  },
+  "launcher": {
+    "verdict": "REUSED",
+    "launchCount": 0,
+    "foregroundActivation": false
+  },
+  "rawEvidencePrivate": true,
+  "records": [
+    {
+      "name": "stata-check",
+      "rc": 0,
+      "stdoutSha256": "1a0b9dde5f2faab2ee461fcdab2951be3f94842dce00d9e7677a6b47b0b82a58",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "portable-tests",
+      "rc": 0,
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "23d5b70966bbba27412bc57b71f1742fe7092ad4c8c74accb0a31bca74d706f0"
+    },
+    {
+      "name": "public-client-live-smoke",
+      "rc": 0,
+      "stdoutSha256": "9490b1471b2b93aba3ad3cb3289522e7e496d41bf7c0e9478415d22414c231be",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "public-open-reuse",
+      "rc": 0,
+      "stdoutSha256": "c0a08db0ff440faf8b395f5d71e1d1f003d43bfe26e46007b7e7f4ff987cdb62",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}

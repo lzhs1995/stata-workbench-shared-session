@@ -1,134 +1,72 @@
 # Stata Workbench Shared Session
 
-Stata Workbench Shared Session is a patched VS Code extension distribution for users who want a visible, real-time Stata session shared by humans and AI agents.
+A VS Code extension for a visible Stata session shared sequentially by a human
+and AI agents. Human Run File/Selection and agent commands use the same backend,
+with visible output, graphs, execution serialization and recovery diagnostics.
 
-The project is derived from `tmonk/stata-workbench` and incorporates local design lessons from comparing `hanlulong/stata-mcp`. The production goal is simple: Stata execution should be visible in the same VS Code Stata Terminal, preserve the live Stata session, keep graph rendering responsive, and provide recovery tools when long research scripts stress the Workbench lifecycle.
+中文：让人与 AI 在 VS Code 中轮流操作同一个 Stata 会话，共享数据和结果。
+不是两个隐藏进程，也不是并发执行。
 
-## Status
+## Current Release
 
-Current public package: `v0.1.1`.
+[Download v0.1.3-rc.7.39-public.1](https://github.com/lzhs1995/stata-workbench-shared-session/releases/tag/v0.1.3-rc.7.39-public.1)
 
-Install channels:
+Public packaging revision of extension version `0.1.3-rc.7.39`. Runtime bundle
+unchanged from the locally accepted Mac installation. This VSIX removes a local
+maintenance token and updates documentation; it is **not byte-identical** to the
+private acceptance VSIX. It is published as a prerelease, not cross-platform stable.
 
-- GitHub Release VSIX: https://github.com/lzhs1995/stata-workbench-shared-session/releases
-- Open VSX: https://open-vsx.org/extension/lzhs1995/stata-workbench-shared-session
-- Visual Studio Marketplace: not published. Marketplace publication is deferred because it requires the Marketplace publisher/PAT workflow.
+The fixed runtime passed a local FULL45 run: 45 scenarios, 632 steps (575
+assertions, 57 observations), independent replay and human-to-agent-to-human
+same-backend proof. S29 had one bounded product zero-ACK retry. S41's native
+self-log was incomplete. See [acceptance scope](docs/ACCEPTANCE.md).
 
-The earlier `v0.1.0` release remains available, but `v0.1.1` is the first package that includes the public taught-task examples and expanded dependency documentation.
+## Install And Use
 
-## What This Extension Is For
+Requirements: licensed Stata, VS Code, Python/uv runtime dependencies. Stata,
+licenses, credentials and private data are not included. Current validation is
+Mac-specific; Windows/Linux do not inherit certification from older releases.
 
-Use this extension when you want Stata execution to remain visible in VS Code while humans and agents work in the same session:
+1. Download the VSIX and verify SHA256SUMS from the release.
+2. Use VS Code **Extensions: Install from VSIX...**.
+3. Configure `stataMcp.stataPath` and open **Stata: Open Interactive Terminal**.
+4. Open a `.do` file; run **Stata: Run Current File** or **Stata: Run Selection/Current Line**.
 
-- Human and agent commands appear in the same `Stata Terminal` surface.
-- Stata memory, globals, estimates, graphs, logs, and command history remain observable.
-- Graph output is routed to a dedicated `Stata Graphs` panel instead of flooding terminal text.
-- Long research scripts can be run through visible execution helpers and verified by audit logs.
-- Recovery scripts help diagnose busy/stale Workbench lifecycle states.
+[中文使用指南](docs/USAGE.zh-CN.md) | [English quick start](docs/QUICKSTART.md)
 
-This is not a hidden batch runner. If a workflow requires user-facing execution, the shared visible Stata Terminal is the intended path.
+For the Mac launcher and AI client, clone this repository at the release tag and
+configure the isolated profile described in the guide:
 
-## Requirements
-
-The tested and supported environment is:
-
-- Windows 10/11.
-- VS Code or an Open VSX-compatible editor.
-- Licensed Stata 18 MP installed locally.
-- PowerShell 5.1+ or PowerShell 7 for helper scripts.
-- Python/uv as required by the upstream `mcp-stata` runtime.
-- Node.js only for development, packaging, or publishing from source.
-
-Other Stata versions, non-MP editions, macOS, and Linux are not the primary tested target. They may work, but should be treated as community best-effort until verified.
-
-This project does not include Stata, Stata license files, private data, logs, generated tables, or research outputs.
-
-See `docs/DEPENDENCIES.md` for the full dependency and packaging boundary.
-
-## Install
-
-### Open VSX
-
-Open the extension page and install from your editor:
-
-https://open-vsx.org/extension/lzhs1995/stata-workbench-shared-session
-
-### GitHub Release VSIX
-
-Download the latest `stata-workbench-shared-session-*.vsix` from:
-
-https://github.com/lzhs1995/stata-workbench-shared-session/releases
-
-Then install:
-
-```powershell
-code --install-extension .\stata-workbench-shared-session-0.1.1.vsix
+```sh
+python3 tools/verified_workbench.py --status
+python3 tools/shared_stata.py --code 'display 1+1' --cwd /absolute/workspace
 ```
 
-If `code` is not on PATH, use `Extensions: Install from VSIX...` inside VS Code.
-
-## Quick Smoke Test
-
-Open `examples/minimal-workspace/smoke.do`, then run the current file or selected code through Stata Workbench. A healthy run prints:
-
-```text
-STATA_WORKBENCH_SMOKE_OK
-```
-
-You should see text output in `Stata Terminal`. Graph-producing examples should populate the separate `Stata Graphs` panel.
-
-## Taught Task Examples
-
-The repository includes nine self-contained Stata do-files in `examples/taught-tasks/`. They use Stata's built-in `auto` data or synthetic data derived from it, so no private dataset is required.
-
-Recommended first run:
-
-```text
-examples/taught-tasks/taught_task1.do
-```
-
-The later files progressively stress graph routing, terminal output, generated variables, `putdocx`, regression workflows, event-study style code, matching/IV/mediation examples, and MI/document-heavy workflows. They are intentionally larger than a normal smoke test.
-
-Read `examples/taught-tasks/README.md` before running all nine files. For very large files, use visible segmented execution and verify run evidence instead of assuming a long terminal run completed successfully.
+The client refuses a wrong bundle/listener owner, duplicate launcher, busy or
+recovering session, or changed backend. It never resets Stata or retries an
+unconfirmed POST. Keep the bridge on loopback: it is not a remote multi-user service.
 
 ## Development
 
-```powershell
-npm install
+```sh
+npm ci --ignore-scripts
 npm run check
+python3 -B -m unittest discover -s tools -p 'test_*.py'
 npm run package
 ```
 
-The extension entry point is `dist/extension.js`. Helper scripts are kept in `scripts/` for local setup, visible bridge invocation, verification, and recovery workflows.
+`check` is read-only with a runtime digest guard. Packaging uses the versioned
+maintained bundle, readable patches/helpers and UI sources, not a claimed clean
+reconstruction of upstream TypeScript. See [release maintenance](docs/RELEASE.md).
+New runtime edits require a new version and fresh live acceptance. CI is offline:
+no licensed Stata, GUI keys, extension installation, or live acceptance claims.
 
-Optional helper-script environment variables:
+## Attribution
 
-```powershell
-$env:STATA_WORKBENCH_WORKSPACE = "C:\path\to\your\stata\workspace"
-$env:STATA_WORKBENCH_CODE = "C:\path\to\Code.exe"
-```
-
-## Community Docs
-
-- Installation: `docs/INSTALL.md`
-- Dependencies: `docs/DEPENDENCIES.md`
-- Taught task walkthrough: `examples/taught-tasks/README.md`
-- Architecture: `docs/ARCHITECTURE.md`
-- Known limitations: `docs/LIMITATIONS.md`
-- FAQ: `docs/FAQ.md`
-- Publishing: `docs/PUBLISHING.md`
-- Maintenance workflow: `docs/MAINTENANCE.md`
-- Roadmap: `docs/ROADMAP.md`
-- Troubleshooting: `docs/TROUBLESHOOTING.md`
-
-## Safety Notes
-
-- Do not commit Stata license files.
-- Do not commit private `.dta`, `.csv`, tables, graphs, logs, or temp outputs.
-- Do not publish local `7_temp` run evidence.
-- Do not paste Marketplace/Open VSX tokens into files.
-- Do not describe hidden Stata execution as shared-session execution.
-
-## Upstream Attribution
-
-See `NOTICE` for upstream attribution and license notes.
+Derived from [tmonk/stata-workbench](https://github.com/tmonk/stata-workbench),
+AGPL-3.0-or-later. Design comparisons with
+[hanlulong/stata-mcp](https://github.com/hanlulong/stata-mcp) are acknowledged in
+[NOTICE](NOTICE), not a claim of runtime interchangeability.
+See [LICENSE](LICENSE) and [SECURITY.md](SECURITY.md).
+GitHub is the current distribution channel; the older Open VSX release is not
+this runtime. Visual Studio Marketplace publication is outside this release.
