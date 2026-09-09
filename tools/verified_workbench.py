@@ -8,6 +8,7 @@ from pathlib import Path
 import subprocess
 import sys
 import time
+import mac_permissions as permissions
 import shlex
 from types import SimpleNamespace
 import urllib.request
@@ -106,8 +107,9 @@ class LocalBridge:
         return {"pid": pid, "ppid": ppid, "launcher": any(i["pid"] == ppid for i in self.code_instances())}
 
     def launcher_window_count(self, pid):
-        return int(output(["/usr/bin/osascript", "-e",
-            f'tell application "System Events"\nset p to first application process whose unix id is {int(pid)}\nreturn count of windows of p\nend tell']))
+        obs = permissions.window_observation(pid)
+        permissions.require_window_observation({"windowObservation": obs, "axWindowCount": obs["count"]})
+        return obs["count"]
 
     def screen_locked(self):
         text = output(["/usr/sbin/ioreg", "-n", "Root", "-d1"])
@@ -137,14 +139,19 @@ def observe(d):
         and status.get("bundleIdentityState") == "OK"
         and status.get("guardModuleIdentityState") == "OK"
         and status.get("extensionHostPid") == owner.get("pid"))
+    window = permissions.window_observation(instances[0]["pid"] if instances else None)
     return {"launcherPid": instances[0]["pid"] if instances else None,
             "owner": owner, "identityOk": identity_ok,
-            "axWindowCount": d.w.launcher_window_count(instances[0]["pid"]) if instances else 0,
+            "axWindowCount": window["count"], "windowObservation": window,
             "status": status}
 
 
 def open_once(d, launch, foreground=True, timeout=120, sleep=time.sleep, clock=time.monotonic):
     before = observe(d)
+    if before["launcherPid"] is not None:
+        permissions.require_window_observation(before)
+    elif not permissions.automation_granted(permissions.permission_status()):
+        raise RuntimeError("permissions not verified; no launch attempted. " + permissions.ADVICE)
     launched = False
     if before["launcherPid"] is None:
         if d.w.screen_locked():
@@ -153,11 +160,16 @@ def open_once(d, launch, foreground=True, timeout=120, sleep=time.sleep, clock=t
         launched = True
     started = clock()
     state = observe(d)
+    if state["launcherPid"] is not None:
+        permissions.require_window_observation(state)
     while not state["identityOk"] and clock() - started < timeout:
         sleep(1)
         state = observe(d)
+        if state["launcherPid"] is not None:
+            permissions.require_window_observation(state)
     if not state["identityOk"]:
         raise RuntimeError("instance exists but bridge identity is not ready; no relaunch/reset/retry")
+    permissions.require_window_observation(state)
     if state["axWindowCount"] != 1:
         raise RuntimeError("expected one rc70 window; no window was closed")
     activation = None
@@ -166,6 +178,9 @@ def open_once(d, launch, foreground=True, timeout=120, sleep=time.sleep, clock=t
         if activation.get("ok") is not True:
             raise RuntimeError("exact instance could not be brought forward; no retry")
     after = observe(d)
+    permissions.require_window_observation(after)
+    if after["axWindowCount"] != 1:
+        raise RuntimeError("window topology changed while opening; no retry")
     if not after["identityOk"] or after["launcherPid"] != state["launcherPid"]:
         raise RuntimeError("instance changed while opening")
     return {"verdict": "OPENED" if launched else "REUSED", "launchCount": int(launched),
@@ -180,15 +195,22 @@ def main():
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--open", action="store_true")
     mode.add_argument("--status", action="store_true")
+    mode.add_argument("--doctor", action="store_true", help="non-prompting host/permission/window diagnosis")
+    mode.add_argument("--request-permissions", action="store_true", help="one read-only System Events query; may show macOS consent")
     parser.add_argument("--no-activate", action="store_true")
     parser.add_argument("--workspace", type=Path, default=Path.cwd())
     args = parser.parse_args()
     os.environ["WS_FG_ALLOWED"] = "1" if args.open and not args.no_activate else "0"
     os.environ["WS_PHYSICAL_KEYS"] = "0"
     d = helpers()
+    if args.doctor or args.request_permissions:
+        result = permissions.diagnostic(d, observe, request=args.request_permissions)
+        print(json.dumps(result, ensure_ascii=False))
+        return 0 if result["verdict"] == "PASS_PERMISSION_WINDOW_CHECK" else 2
     if args.status:
-        print(json.dumps(observe(d), ensure_ascii=False))
-        return 0
+        state = observe(d)
+        print(json.dumps(state, ensure_ascii=False))
+        return 0 if state["identityOk"] and state["windowObservation"]["ok"] and state["axWindowCount"] == 1 else 2
     with open("/private/tmp/stata-workbench-verified-open.lock", "a+") as handle:
         fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
@@ -208,5 +230,6 @@ if __name__ == "__main__":
     try:
         sys.exit(main())
     except Exception as exc:
-        print(json.dumps({"verdict": "BLOCKED", "error": str(exc), "automaticRetry": False}, ensure_ascii=False))
+        print(json.dumps({"verdict": "BLOCKED", "error": str(exc), "automaticRetry": False,
+                          "windowObservation": getattr(exc, "observation", None)}, ensure_ascii=False))
         sys.exit(2)

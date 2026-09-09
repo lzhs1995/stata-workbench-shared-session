@@ -77,3 +77,18 @@ Preserves the Mac-accepted runtime; removes local maintenance credentials, adds 
 - Adds helper scripts for visible bridge execution, safe execution, segmented runs, verification, and recovery.
 - Adds public documentation, license/notice, packaging metadata, and CI skeleton.
 - Adds Marketplace/Open VSX publishing notes, FAQ, limitations, roadmap, icon, and minimal smoke-test workspace.
+# Public revision 2 — 2026-09-09
+
+- Mac tool version 1.1.0; extension version remains 0.1.3-rc.7.39. Runtime and
+  historical acceptance manifests unchanged; no research data or private receipts exported.
+- Non-lossy window observations, passive consent check, explicit one-shot request,
+  host/signature diagnosis and recent tccd database-error hints. Permission failure
+  never becomes zero windows or automatic restart/retry; after-POST failure remains
+  execution-unconfirmed rather than falsely zero-dispatch.
+- Updated Chinese/English permission setup and empty Automation list guidance.
+- Offline tests cover denied/required consent, inaccessible targets, timeouts,
+  malformed output, genuine 0/1/multiple windows, pre- and post-POST revocation.
+- Live boundary: one read-only permission request returned -1743; native check and
+  correlated logs showed user permission-service database-open failure. The real
+  shared client blocked with zero POST. No post-grant smoke or fresh FULL45 was
+  performed; this release does not certify that blocked machine as recovered.

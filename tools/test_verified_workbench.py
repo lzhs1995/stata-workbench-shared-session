@@ -15,7 +15,11 @@ class LauncherTests(unittest.TestCase):
 
     def setUp(self):
         self.state = {"launcherPid": 20, "owner": {"pid": 21, "ppid": 20},
-                      "identityOk": True, "axWindowCount": 1, "status": {}}
+                      "identityOk": True, "axWindowCount": 1, "status": {},
+                      "windowObservation": {"ok": True, "count": 1, "status": "OK"}}
+        self.consent = patch.object(v.permissions, "permission_status", return_value={"status": "GRANTED", "osStatus": 0})
+        self.consent.start()
+        self.addCleanup(self.consent.stop)
         self.launched = []
         self.activated = []
         self.d = SimpleNamespace(w=SimpleNamespace(screen_locked=lambda: False),
@@ -70,10 +74,38 @@ class LauncherTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "does not belong"):
             v.observe(SimpleNamespace(w=w))
         w.bridge_owner = lambda: {"pid": 21, "ppid": 20, "launcher": True}
-        self.assertTrue(v.observe(SimpleNamespace(w=w))["identityOk"])
+        with patch.object(v.permissions, "window_observation", return_value={"ok": True, "count": 1, "status": "OK"}):
+            self.assertTrue(v.observe(SimpleNamespace(w=w))["identityOk"])
         w.code_instances = lambda: [instance, copy.deepcopy(instance)]
         with self.assertRaisesRegex(RuntimeError, "multiple"):
             v.observe(SimpleNamespace(w=w))
+
+    def test_permission_failure_stops_before_launch_or_activation(self):
+        bad = dict(self.state, axWindowCount=None, windowObservation={"ok": False, "count": None, "status": "AUTOMATION_DENIED"})
+        with patch.object(v, "observe", return_value=bad) as obs:
+            with self.assertRaisesRegex(RuntimeError, "AUTOMATION_DENIED"):
+                v.open_once(self.d, lambda: self.launched.append(True))
+        self.assertEqual(obs.call_count, 1)
+        self.assertEqual(self.launched, [])
+        self.assertEqual(self.activated, [])
+
+    def test_no_permission_no_cold_launch(self):
+        with patch.object(v, "observe", return_value=dict(self.state, launcherPid=None)), patch.object(v.permissions, "permission_status", return_value={"status": "AUTOMATION_DENIED"}):
+            with self.assertRaisesRegex(RuntimeError, "no launch"):
+                v.open_once(self.d, lambda: self.launched.append(True))
+        self.assertEqual(self.launched, [])
+
+    def test_observe_never_calls_lossy_legacy_window_helper(self):
+        from unittest.mock import Mock
+        window = {"ok": False, "count": None, "status": "AUTOMATION_DENIED", "appleEventError": -1743}
+        w = SimpleNamespace(code_instances=lambda: [{"launcher": True, "pid": 20}],
+            bridge_owner=lambda: {"pid": 21, "ppid": 20, "launcher": True}, status=lambda **kw: {},
+            launcher_window_count=Mock(side_effect=AssertionError("legacy helper called")))
+        with patch.object(v.permissions, "window_observation", return_value=window):
+            state = v.observe(SimpleNamespace(w=w))
+        self.assertIsNone(state["axWindowCount"])
+        self.assertEqual(state["windowObservation"], window)
+        w.launcher_window_count.assert_not_called()
 
 
 if __name__ == "__main__":
