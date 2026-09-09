@@ -30,6 +30,10 @@ def _valid_backend_pids(value):
 
 def ready(instance):
     s = instance.get("status") or {}
+    try:
+        entry.permissions.require_window_observation(instance)
+    except entry.permissions.WindowObservationError:
+        return False
     return (instance.get("identityOk") is True and type(instance.get("axWindowCount")) is int
             and instance["axWindowCount"] == 1 and s.get("busy") is False
             and s.get("postRunBusy") is False and s.get("trueReady") is True
@@ -82,6 +86,7 @@ def execute_once(d, request, receipt, timeout=3600, observe=entry.observe, sleep
     try:
         before = observe(d)
         result["before"] = before
+        entry.permissions.require_window_observation(before)
         if not ready(before):
             raise RuntimeError("existing session is not ready; no launch, reset or dispatch")
         write_once(receipt / "request.json", request)
@@ -104,11 +109,14 @@ def execute_once(d, request, receipt, timeout=3600, observe=entry.observe, sleep
         after = observe(d)
         # Only observe completion settlement. Never repeat the POST.
         for _ in range(30):
-            if ready(after) or http != 200:
+            if ready(after) or http != 200 or after.get("windowObservation", {}).get("ok") is not True:
                 break
             sleep(1)
             after = observe(d)
+            if after.get("windowObservation", {}).get("ok") is not True:
+                break
         result["after"] = after
+        entry.permissions.require_window_observation(after)
         checks = completion_checks({"clientToken": token}, http, body, before, after)
         result["checks"] = checks
         result["failedChecks"] = [k for k, v in checks.items() if v is not True]
@@ -127,6 +135,7 @@ def execute_once(d, request, receipt, timeout=3600, observe=entry.observe, sleep
             result["verdict"] = "PASS_VISIBLE_SHARED_RUN"
     except Exception as exc:
         result["error"] = repr(exc)
+        result["windowObservation"] = getattr(exc, "observation", None)
     finally:
         result["endedAtEpoch"] = time.time()
         write_once(receipt / "result.json", result)
@@ -167,7 +176,8 @@ def main():
         result = execute_once(d, request, receipt, args.timeout)
     print(json.dumps({"verdict": result["verdict"], "postCount": result["postCount"], "retryCount": 0,
                       "runId": (result.get("response") or {}).get("runId"), "receipt": str(receipt),
-                      "error": result["error"], "failedChecks": result.get("failedChecks")}, ensure_ascii=False))
+                      "error": result["error"], "failedChecks": result.get("failedChecks"),
+                      "windowObservation": result.get("windowObservation")}, ensure_ascii=False))
     return 0 if result["verdict"] == "PASS_VISIBLE_SHARED_RUN" else 2
 
 

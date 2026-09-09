@@ -12,6 +12,12 @@
 
 ## AI 接入
 
+首次接入或遇到 `-1743`：在报错 agent 的同一宿主运行
+`python3 -B tools/verified_workbench.py --doctor`，再按诊断运行一次
+`python3 -B tools/verified_workbench.py --request-permissions`。系统弹窗需本人允许。
+权限失败现在显示未知窗口数 `null`，不再冒充“窗口数为 0”。
+[完整权限说明：自动化空列表、辅助功能、持久性与系统故障](MAC_PERMISSIONS.md)。
+
 AI 必须使用同一 profile、同一端口的 `tools/shared_stata.py`，不另起隐藏 Stata。
 `tools/verified_workbench.py --status` 只检查，`--open` 复用现有窗口。
 [快速开始](QUICKSTART.md) 提供人工创建 40、AI 改为 42、人工读取并清理的例子。

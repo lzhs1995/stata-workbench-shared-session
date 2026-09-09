@@ -29,11 +29,9 @@ class PublicReleaseTests(unittest.TestCase):
             entry.LocalBridge().request("/force-reset", {})
 
     def test_apple_script_window_binding(self):
-        with patch.object(entry, "output", return_value="1") as out:
+        with patch.object(entry.permissions, "window_observation", return_value={"ok": True, "count": 1}) as out:
             self.assertEqual(entry.LocalBridge().launcher_window_count(42), 1)
-            script = out.call_args.args[0][-1]
-            self.assertIn("set p to first application process whose unix id is 42", script)
-            self.assertIn("count of windows of p", script)
+            out.assert_called_once_with(42)
 
     def test_profile_prefix_collision_rejected(self):
         expected = str(entry.PROFILE / "user-data")

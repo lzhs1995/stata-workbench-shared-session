@@ -9,12 +9,18 @@ with visible output, graphs, execution serialization and recovery diagnostics.
 
 ## Current Release
 
-[Download v0.1.3-rc.7.39-public.1](https://github.com/lzhs1995/stata-workbench-shared-session/releases/tag/v0.1.3-rc.7.39-public.1)
+[Download v0.1.3-rc.7.39-public.2](https://github.com/lzhs1995/stata-workbench-shared-session/releases/tag/v0.1.3-rc.7.39-public.2)
 
 Public packaging revision of extension version `0.1.3-rc.7.39`. Runtime bundle
 unchanged from the locally accepted Mac installation. This VSIX removes a local
 maintenance token and updates documentation; it is **not byte-identical** to the
 private acceptance VSIX. It is published as a prerelease, not cross-platform stable.
+
+Revision 2 updates Mac tools and permission documentation: errors such as `-1743`
+are no longer reported as zero windows. Use `--doctor` and explicit
+`--request-permissions` in the actual agent host. This is a diagnostic/guard fix,
+**not a claim that every host is authorized**; the observed local permission-service
+failure still needs system recovery. [Permission guide](docs/MAC_PERMISSIONS.md).
 
 The fixed runtime passed a local FULL45 run: 45 scenarios, 632 steps (575
 assertions, 57 observations), independent replay and human-to-agent-to-human

@@ -15,10 +15,40 @@ def state(rid="old"):
          "perRunCompletionMarkerVerified": True, "perRunEvidenceFailure": None}
     s["lastCompletedRun"] = dict(s)
     return {"identityOk": True, "axWindowCount": 1, "launcherPid": 12,
+            "windowObservation": {"ok": True, "count": 1, "status": "OK"},
             "owner": {"pid": 13, "ppid": 12}, "status": s}
 
 
 class SharedClientTests(unittest.TestCase):
+    def test_permission_revoked_after_post_is_unconfirmed_not_zero_dispatch(self):
+        with tempfile.TemporaryDirectory() as directory:
+            after = state("new")
+            after.update(axWindowCount=None, windowObservation={"ok": False, "count": None, "status": "AUTOMATION_DENIED"})
+            post = Mock(return_value=(200, {"ok": True, "rc": 0, "runId": "new"}))
+            obs = Mock(side_effect=[state(), after])
+            sleep = Mock()
+            result = client.execute_once(SimpleNamespace(w=SimpleNamespace(http_post=post)),
+                {"code": "display 1"}, Path(directory) / "receipt", observe=obs, sleep=sleep)
+            self.assertEqual(result["verdict"], "EXECUTION_UNCONFIRMED_NO_RETRY")
+            self.assertEqual(result["postCount"], 1)
+            self.assertEqual(result["after"], after)
+            self.assertEqual(post.call_count, 1)
+            self.assertEqual(obs.call_count, 2)
+            sleep.assert_not_called()
+
+    def test_denial_retains_error_without_post(self):
+        with tempfile.TemporaryDirectory() as directory:
+            bad = state()
+            bad.update(axWindowCount=None, windowObservation={"ok": False, "count": None,
+                "status": "AUTOMATION_DENIED", "returnCode": 1, "stderr": "Not authorized (-1743)", "appleEventError": -1743})
+            post = Mock()
+            result = client.execute_once(SimpleNamespace(w=SimpleNamespace(http_post=post)),
+                {"code": "display 1"}, Path(directory) / "receipt", observe=lambda _: bad)
+            self.assertEqual(result["verdict"], "BLOCKED_NO_DISPATCH")
+            self.assertEqual(result["postCount"], 0)
+            self.assertEqual(result["windowObservation"], bad["windowObservation"])
+            post.assert_not_called()
+
     def test_exact_completion_and_missing_matrix(self):
         before, after = state(), state("new")
         body = {"ok": True, "rc": 0, "runId": "new", "requestId": "req"}

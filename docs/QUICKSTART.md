@@ -12,7 +12,9 @@ export STATA_WORKBENCH_PORT=17485
   --install-extension ./stata-workbench-shared-session-0.1.3-rc.7.39.vsix
 git clone https://github.com/lzhs1995/stata-workbench-shared-session.git
 cd stata-workbench-shared-session
-git checkout v0.1.3-rc.7.39-public.1
+git checkout v0.1.3-rc.7.39-public.2
+python3 -B tools/verified_workbench.py --doctor
+python3 -B tools/verified_workbench.py --request-permissions
 python3 tools/verified_workbench.py --open --workspace "$PWD/examples/minimal-workspace"
 ```
 
@@ -20,7 +22,11 @@ Set `stataMcp.stataPath` to your licensed executable in this profile. Run
 **Stata: Open Interactive Terminal**, then manually execute `display 1+1` to load
 the backend. A port collision is a refusal, not permission to kill another editor.
 Use a free `stataMcp.visibleBridgePort` and matching `STATA_WORKBENCH_PORT` if needed.
-Mac Accessibility permission is required for window identity observation/opening.
+Approve the System Events Automation prompt in the same host used by the agent.
+Accessibility is a separate requirement for window observation/opening.
+The setup command never starts Stata; a pre-open diagnostic can report blocked
+because no window exists yet. After granting permission, use `--open` once.
+See [permission setup and empty-list troubleshooting](MAC_PERMISSIONS.md).
 
 ## Share The Session
 
