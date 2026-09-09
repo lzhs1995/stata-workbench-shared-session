@@ -1,4 +1,4 @@
-"""Verify public source/VSIX runtime against the accepted runtime manifest."""
+"""Verify source/VSIX identity against its declared manifest; not live acceptance."""
 import argparse
 import hashlib
 import json
@@ -26,6 +26,7 @@ def verify(vsix=None, root=ROOT):
             archive.close()
     return {"verdict": "PASS" if all(checks.values()) else "FAIL", "checks": len(checks),
             "failedChecks": [k for k, ok in checks.items() if not ok],
+            "candidateId": manifest.get("candidateId"), "acceptance": manifest.get("acceptance", "HISTORICAL_SCOPE_SEPARATE"),
             "scope": "runtime identity only; not fresh live acceptance"}
 
 

@@ -10,7 +10,8 @@ const hash = () => crypto.createHash("sha256").update(fs.readFileSync(path.join(
 const before = hash();
 // Exclude patch application, not regressions; retain --check finalization.
 const mutators = new Set(["node scripts/apply_rc7_shared_execution_patch.js", "node scripts/finalize_bundle_identity.js"]);
-const commands = ["node scripts/audit_candidate_readonly.js", ...pkg.scripts["check:legacy"].split(" && ")];
+const commands = ["node scripts/audit_candidate_readonly.js", "node scripts/wire_visible_cowork.js --check",
+  "node --test scripts/test_visible_cowork.js", ...pkg.scripts["check:legacy"].split(" && ")];
 let count = 0;
 for (const command of commands) {
   if (mutators.has(command)) continue;

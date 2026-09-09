@@ -10,6 +10,7 @@ import sys
 import time
 import mac_permissions as permissions
 import shlex
+import re
 from types import SimpleNamespace
 import urllib.request
 import urllib.error
@@ -20,7 +21,7 @@ EXTENSION = PROFILE / "extensions/lzhs1995.stata-workbench-shared-session-0.1.3-
 PORT = int(os.environ.get("STATA_WORKBENCH_PORT", "17485"))
 CODE_CLI = os.environ.get("STATA_WORKBENCH_CODE", "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code")
 VERSION = "0.1.3-rc.7.39"
-BUNDLE_SHA256 = "ff463c8e41ef04261f91bbbee673b260036e84bc5f759b9da681d1516c5b83f1"
+BUNDLE_SHA256 = "3ecb55cdf508e796a238266c6897ff9c1307b73572588c5c5cf893563d81e859"
 PINS = {
     WORK / "dist/extension.js": BUNDLE_SHA256,
 }
@@ -51,7 +52,7 @@ class LocalBridge:
         return self.request(path, payload, timeout)
 
     def request(self, path, payload=None, timeout=5):
-        if path not in ("/status", "/run-command"):
+        if path not in ("/status", "/run-command", "/cowork/status", "/cowork/prepare", "/cowork/control", "/cowork/finish"):
             raise ValueError("unsupported endpoint")
         req = urllib.request.Request(f"http://127.0.0.1:{PORT}{path}",
             data=json.dumps(payload).encode() if payload is not None else None,
@@ -113,7 +114,12 @@ class LocalBridge:
 
     def screen_locked(self):
         text = output(["/usr/sbin/ioreg", "-n", "Root", "-d1"])
-        return '"CGSSessionScreenIsLocked" = Yes' in text or '"ScreenIsLocked" = Yes' in text
+        if '"CGSSessionScreenIsLocked" = Yes' in text or '"ScreenIsLocked" = Yes' in text:
+            return True
+        measured = re.search(r'"IOConsoleLocked" = (Yes|No)', text)
+        if not measured:
+            raise RuntimeError("screen lock state unmeasured")
+        return measured[1] == "Yes"
 
 
 def activate_once(pid):
@@ -139,10 +145,16 @@ def observe(d):
         and status.get("bundleIdentityState") == "OK"
         and status.get("guardModuleIdentityState") == "OK"
         and status.get("extensionHostPid") == owner.get("pid"))
-    window = permissions.window_observation(instances[0]["pid"] if instances else None)
+    locked = d.w.screen_locked()
+    if type(locked) is not bool:
+        raise RuntimeError("screen lock state unmeasured")
+    window = ({"ok": False, "count": None, "status": "SCREEN_LOCKED",
+               "targetPid": instances[0]["pid"] if instances else None,
+               "advice": "Visible execution requires an unlocked screen; no window count or permission failure inferred."}
+              if locked else permissions.window_observation(instances[0]["pid"] if instances else None))
     return {"launcherPid": instances[0]["pid"] if instances else None,
             "owner": owner, "identityOk": identity_ok,
-            "axWindowCount": window["count"], "windowObservation": window,
+            "axWindowCount": window["count"], "windowObservation": window, "screenLocked": locked,
             "status": status}
 
 

@@ -6,6 +6,8 @@ node_modules/**
 tests/**
 release/**
 tools/test_*.py
+!tools/test_cowork_task.py
+!tools/test_shared_stata.py
 **/__pycache__/**
 **/*.pyc
 .gitleaks.toml

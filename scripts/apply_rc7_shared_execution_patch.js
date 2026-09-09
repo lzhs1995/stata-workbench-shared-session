@@ -3405,5 +3405,8 @@ if (!text.includes("codex patch r16j126: stderr consumer per transport")) {
     'this._attachStderrListener(C.stderr,"post_connect",Q)');
 }
 
+// Visible co-working participates in baseline replay, not just the checked-in bundle.
+text = require("./wire_visible_cowork").wire(text, require("crypto").createHash("sha256")
+  .update(fs.readFileSync(require("path").join(__dirname, "visible_cowork.js"))).digest("hex"));
 fs.writeFileSync(target, text, "utf8");
 console.log(baseAlreadyApplied ? "RC7_SHARED_EXECUTION_UPDATED" : "RC7_SHARED_EXECUTION_APPLIED", target);

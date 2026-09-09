@@ -70,7 +70,7 @@ class LauncherTests(unittest.TestCase):
                   "bundleIdentityState": "OK", "guardModuleIdentityState": "OK", "extensionHostPid": 21}
         w = SimpleNamespace(code_instances=lambda: [instance],
             bridge_owner=lambda: {"pid": 21, "ppid": 99, "launcher": True},
-            status=lambda **kw: status, launcher_window_count=lambda pid: 1)
+            status=lambda **kw: status, launcher_window_count=lambda pid: 1, screen_locked=lambda: False)
         with self.assertRaisesRegex(RuntimeError, "does not belong"):
             v.observe(SimpleNamespace(w=w))
         w.bridge_owner = lambda: {"pid": 21, "ppid": 20, "launcher": True}
@@ -100,12 +100,34 @@ class LauncherTests(unittest.TestCase):
         window = {"ok": False, "count": None, "status": "AUTOMATION_DENIED", "appleEventError": -1743}
         w = SimpleNamespace(code_instances=lambda: [{"launcher": True, "pid": 20}],
             bridge_owner=lambda: {"pid": 21, "ppid": 20, "launcher": True}, status=lambda **kw: {},
-            launcher_window_count=Mock(side_effect=AssertionError("legacy helper called")))
+            launcher_window_count=Mock(side_effect=AssertionError("legacy helper called")), screen_locked=lambda:False)
         with patch.object(v.permissions, "window_observation", return_value=window):
             state = v.observe(SimpleNamespace(w=w))
         self.assertIsNone(state["axWindowCount"])
         self.assertEqual(state["windowObservation"], window)
         w.launcher_window_count.assert_not_called()
+
+    def test_lock_is_not_reported_as_zero_windows_or_permission_denied(self):
+        w=SimpleNamespace(code_instances=lambda:[{"launcher":True,"pid":20}],
+            bridge_owner=lambda:{"pid":21,"ppid":20,"launcher":True},
+            status=lambda **kw:{"ownedBackendPids":[14],"busy":False},screen_locked=lambda:True)
+        with patch.object(v.permissions,"window_observation") as query:
+            result=v.observe(SimpleNamespace(w=w))
+        query.assert_not_called()
+        self.assertIsNone(result["axWindowCount"])
+        self.assertTrue(result["screenLocked"])
+        self.assertEqual(result["windowObservation"]["status"],"SCREEN_LOCKED")
+        self.assertEqual(result["status"]["ownedBackendPids"],[14])
+        with self.assertRaisesRegex(RuntimeError,"SCREEN_LOCKED"):
+            v.permissions.require_window_observation(result)
+
+    def test_screen_state_parser_rejects_absence(self):
+        for text, expected in [('"IOConsoleLocked" = Yes',True),('"IOConsoleLocked" = No',False),
+                               ('"CGSSessionScreenIsLocked" = Yes',True)]:
+            with patch.object(v,"output",return_value=text):
+                self.assertIs(v.LocalBridge().screen_locked(),expected)
+        with patch.object(v,"output",return_value="unreadable"):
+            with self.assertRaisesRegex(RuntimeError,"unmeasured"):v.LocalBridge().screen_locked()
 
 
 if __name__ == "__main__":

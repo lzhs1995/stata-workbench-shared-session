@@ -1,5 +1,10 @@
 # Stata Workbench Shared Session
 
+> This development branch contains `visible-cowork-1-dev.6`, **not a new
+> live-accepted release**. Read [candidate scope and remaining acceptance](docs/VISIBLE_COWORK_UPGRADE.md).
+> Do not install over an active research backend. The released version below
+> remains a separate, unchanged runtime; its FULL45 evidence does not cover this branch.
+
 A VS Code extension for a visible Stata session shared sequentially by a human
 and AI agents. Human Run File/Selection and agent commands use the same backend,
 with visible output, graphs, execution serialization and recovery diagnostics.

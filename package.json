@@ -73,7 +73,11 @@
         "command": "stata-workbench.openTerminal",
         "title": "Stata: Open Interactive Terminal",
         "icon": "$(terminal)"
-      }
+      },
+      {"command": "stata-workbench.coworkStart", "title": "Stata: Prepare Visible Collaboration Layout (No Execution)"},
+      {"command": "stata-workbench.coworkPause", "title": "Stata: Pause Following Stages"},
+      {"command": "stata-workbench.coworkResume", "title": "Stata: Resume Following Stages"},
+      {"command": "stata-workbench.coworkCancel", "title": "Stata: Cancel Current and Pause Following Stages"}
     ],
     "menus": {
       "editor/title": [
