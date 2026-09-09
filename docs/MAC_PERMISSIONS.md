@@ -80,15 +80,42 @@ none of those things and do not restart system services.
 
 ## Persistence and acceptance boundary
 
+### Verified recovery follow-up — 2026-09-09
+
+The affected local Mac **subsequently recovered**. Reboot alone had not fixed it:
+the new user `tccd` opened its version-32 database successfully, then logged
+`database is locked`, invalid connection errors and repeated open failures.
+Read-only `quick_check` was still OK. A scoped maintenance intervention ended
+that stalled user service (normal termination did not complete; the exact
+identity-checked process was then terminated), and macOS relaunched it. The
+system service was not terminated. No TCC database edit/deletion, permission
+reset, re-signing or SIP change was performed. The observed access-record count
+was 1,223 before and after; this count alone is not proof of individual grants.
+
+Actual subsequent checks established permission **GRANTED**, one correctly
+bound Workbench window, and successful `display`-only runs through the existing
+terminal-handler diagnostic API and the formal AI shared client. Both paths
+used the same Stata backend; the AI client made one POST, zero retries, returned
+`rc=0`, and its exact client/run completion markers were read from the raw log.
+All 20 recovery readback checks passed; the final instance was idle/ready with
+recovery not required. The accepted runtime bundle was unchanged.
+
+This is a **local recovery observation, not a universal restart recipe**. The
+tools do not automatically terminate permission services. Do not kill arbitrary
+PIDs or alter privacy records. Diagnosing a confirmed service deadlock is
+different from bypassing an actual permission denial. No new FULL45 or physical
+human typing was claimed for this follow-up.
+
 Normal macOS consent is saved by the system, but cannot be guaranteed forever:
 user revocation, managed policy, a different host, changed signing identity or
 system failure can change effective access. Use a stable signed host and the
 same tools/profile; recheck permissions before execution rather than caching a
 past success as a permanent grant.
 
-This revision has offline failure-path tests and a real zero-dispatch denial
+At publication, this revision had offline failure-path tests and a real zero-dispatch denial
 receipt. **The affected host's recovery and a post-grant Stata smoke run were not
-completed at publication** because its permission service was blocked; no fresh
+completed at publication** because its permission service was blocked. The dated
+follow-up above records subsequent recovery without rewriting that history; no fresh
 FULL45 or new universal permission certification is claimed. Historical local
 runtime acceptance remains scoped as described in [ACCEPTANCE](ACCEPTANCE.md).
 
