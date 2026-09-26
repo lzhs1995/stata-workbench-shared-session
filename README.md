@@ -1,5 +1,7 @@
 # Stata Workbench Shared Session
 
+Toolchain guide revision **2026-09-26**: [research handoff and archive lessons](docs/empirical-review-and-archive.md). This guide revision leaves runtime **0.1.3-rc.7.39** unchanged; it does not certify a candidate co-working protocol or require a running backend restart.
+
 A VS Code extension for a visible Stata session shared sequentially by a human
 and AI agents. Human Run File/Selection and agent commands use the same backend,
 with visible output, graphs, execution serialization and recovery diagnostics.
