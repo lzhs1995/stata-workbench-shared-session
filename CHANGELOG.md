@@ -1,3 +1,7 @@
+## Toolchain guide 2026-09-26
+
+Document empirical handoff, archive root compatibility and source/installed/loaded runtime distinctions. No runtime source, bundled extension or package version changes in this guide revision.
+
 # Public packaging revision 0.1.3-rc.7.39-public.1 (2026-09-08)
 
 Preserves the Mac-accepted runtime; removes local maintenance credentials, adds portable tools, read-only CI, release manifests and bilingual usage guides. The public VSIX has a new hash and is not the private accepted archive. Historical failures and acceptance limitations are disclosed in docs/ACCEPTANCE.md. Development dependency security updates do not rebuild the embedded runtime.
