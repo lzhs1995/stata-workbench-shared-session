@@ -19,6 +19,36 @@ Do not lower the budget merely to pass a check, restart the backend or submit a
 completed stage again. A user-permitted covered window is a separate condition
 and does not prevent these activities.
 
+## Trigger backup before crossing the free-space reserve
+
+Record the user's reserve in bytes and check it before every large stage. In the
+local case the user requested **10 GB = 10,000,000,000 bytes**. Start backup of
+completed large files when current free space is below that reserve, or when the
+next stage's estimated peak writes would take it below the reserve. Keep any
+higher existing stage budget. This is a task policy, not a new runtime default.
+
+Prepare manifests and bounded packages early and send them to the authorized
+**dedicated task folder** through the existing transfer coordinator. Budget the
+upload cache, downloaded verification copy and packaging temporary files too.
+Recheck free space after a queue or lock wait and between large packages; a past
+measurement cannot account for other writers on the same disk. Reserve enough
+space for the backup itself before dispatching further large research exports.
+
+Uploading alone frees no local space. Reclaim only the owned, completed files
+allowed by the task's storage policy after complete round-trip SHA verification
+and settlement. Preserve raw inputs, frozen scientific bytes and failure records.
+Continue source review, dependency tracing and documentation while a write-heavy
+stage waits; do not pause all work, lower its budget or replay successful stages.
+
+A short contention on the existing transfer-consumer lock may be handled by a
+bounded acquisition wait before any transfer submission. Preserve the lock's
+inode, record timeout as zero submission only when the evidence proves it, and
+recheck identity and disk budget after acquiring it. This is distinct from the
+short desktop-focus lease and never authorizes retrying a cloud operation whose
+outcome is unknown. The local successor uses a 60-second consumer wait while
+retaining 20-second focus holds and 8-second input idle checks; these are local
+coordination settings, not universal product limits.
+
 ## Back up before reclaiming local storage
 
 1. Select owned, completed, stable outputs. Keep raw inputs, failed attempts and
