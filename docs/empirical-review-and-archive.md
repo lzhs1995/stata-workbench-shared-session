@@ -1,5 +1,7 @@
 # Research handoff and archive lessons
 
+For large pipelines, also read [disk planning, verified backup and SMCL receipts](storage-and-log-recovery.md).
+
 Use the [shared-session skill](https://github.com/lzhs1995/stata-workbench-shared-session-skill)
 for source/Terminal layout, serialized stages and preserved memory. The plugin
 supplies runtime capability; installing a guide does not load new backend code.
