@@ -1,3 +1,11 @@
+## Toolchain guide 2026-10-01
+
+Document explicit shared execution with user-permitted covering, hiding or minimization;
+separate physical visibility from execution receipts. Clarify serial use of one backend,
+offline parallel work and the unverified multi-instance isolation contract. Preserve
+unknown outcomes and completed prefixes on resume. Documentation only: no runtime,
+client, bundle or package version change, and no new live concurrency certification.
+
 ## Toolchain guide 2026-09-26
 
 Document empirical handoff, archive root compatibility and source/installed/loaded runtime distinctions. No runtime source, bundled extension or package version changes in this guide revision.
