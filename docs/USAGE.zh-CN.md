@@ -1,5 +1,8 @@
 # 人与 AI 共享 Stata 会话使用指南
 
+窗口允许遮挡/隐藏及多实例的边界，见[共享执行与并发指南](shared-execution-and-concurrency.md)。
+同一 backend 内提交仍串行；本次经验更新不改变公共客户端或要求重启现役实例。
+
 ## 打开和人工使用
 
 通过 VS Code 的「Extensions: Install from VSIX...」安装 Release 下载的 VSIX。
