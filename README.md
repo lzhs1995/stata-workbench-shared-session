@@ -1,13 +1,14 @@
 # Stata Workbench Shared Session
 
-Toolchain guide revision **2026-09-26**: [research handoff and archive lessons](docs/empirical-review-and-archive.md). This guide revision leaves runtime **0.1.3-rc.7.39** unchanged; it does not certify a candidate co-working protocol or require a running backend restart.
+Toolchain guide revision **2026-10-01**: [explicit shared execution, permitted hiding and concurrency](docs/shared-execution-and-concurrency.md), plus [research handoff and archive lessons](docs/empirical-review-and-archive.md). Documentation changes leave public runtime **0.1.3-rc.7.39** unchanged; they do not certify a candidate protocol or require a running backend restart.
 
 A VS Code extension for a visible Stata session shared sequentially by a human
 and AI agents. Human Run File/Selection and agent commands use the same backend,
 with visible output, graphs, execution serialization and recovery diagnostics.
 
 中文：让人与 AI 在 VS Code 中轮流操作同一个 Stata 会话，共享数据和结果。
-不是两个隐藏进程，也不是并发执行。
+同一 backend 内人机串行提交。用户允许时，现有共享窗口可遮挡、隐藏或最小化；
+这不改变执行所属会话。多实例并发需各自隔离和验证，当前公共客户端不提供通用多实例调度。
 
 ## Current Release
 
