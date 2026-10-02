@@ -53,6 +53,49 @@ DTA files transparently compressed with ordinary bytes preserved. Later batches
 must earn their own receipts. This is experience with a task-specific adapter,
 not a universal Baidu API or product support guarantee.
 
+## Resume the verified prefix and distinguish transfer intent
+
+Keep the transfer state explicit: prepared, intent recorded, native submission
+observed, upload settled, downloaded, full hash verified, consumer released.
+An intent written before a focus-lock timeout does not prove a native upload.
+Conversely, a missing result file does not prove that no transfer occurred.
+Inspect the original processes, native transfer history and destination before
+choosing the first unsubmitted operation. Never repeat an unknown operation.
+
+A reviewed successor must pin its code and request, reuse the verified prefix,
+and list upload-only, download-only and untouched packages separately. An older
+admission does not authorize changed successor code. Preserve failed attempts;
+combine receipts from all attempts for final acceptance. A partly verified batch
+does not satisfy a whole-batch compression contract. Reclamation must bind the
+actual combined final receipt and required coordinator acceptance, not an old
+single-attempt success path that never existed.
+
+Waiting for a shared focus lock and holding it are separate limits. A longer
+bounded acquisition wait must not lengthen the short focus transaction, weaken
+input-idle checks or retain focus through network transfer. Recheck conditions
+at acquisition; reject stale callbacks before any desktop input.
+
+## Reclaim duplicate caches without invalidating backup evidence
+
+Once an owned transfer is terminal and its full round trip is accepted, redundant
+upload/download caches may be reclaimed under the applicable storage policy.
+First verify the retained canonical archive and manifest, source stability,
+cache identity and bytes, absence of open handles, and the existing consumer
+lease. Keep the accepted receipts and cloud copy. Remove only the enumerated
+duplicate paths; a directory name or apparent age is not proof of ownership.
+
+Publish a maintenance receipt linking the original acceptance, removed cache
+paths/hashes and retained canonical package. Readers should use that receipt
+to explain an old cache path's absence, not treat it as lost research data or
+automatically download it again. A maintenance receipt without retained content
+verification cannot establish recoverability. Measure free space again after
+cleanup; shared-machine writes can consume the allocation just reclaimed.
+
+These lessons include a local 21-package backup whose first 14 round trips were
+verified over two failed attempts, with the remaining seven unsubmitted at the
+time of review. They do not claim that the whole batch passed or authorize its
+compression. Queue ownership and runtime bindings remain unchanged.
+
 ## Read SMCL markers without mistaking echoed code for output
 
 A successful native Stata log may prefix a printed marker with `{res}`, `{txt}`

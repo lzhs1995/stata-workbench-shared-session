@@ -28,3 +28,20 @@ external mapping. Do not weaken historical gates. Final ZIPs need exact
 prefix/member-set, CRC/size/SHA and declared source-mapping checks. The reusable
 [manifest link checker](https://github.com/lzhs1995/thesis-refiner/blob/main/references/delivery-manifest.md)
 generates local delivery links; integrity does not replace scientific or listening review.
+
+## Verify exact variable names and abbreviation state separately
+
+A historical command may use a unique prefix rather than the full released DTA
+field name. For example, `qq9010` may resolve to `qq9010n` when `varabbrev` is on.
+A metadata reader finding no exact `qq9010` field is not sufficient evidence of
+Stata `r(111)`. Check the complete candidate set, case and ambiguity, and record
+the actual session setting before execution. Record no-match, ambiguous prefix
+and unique-prefix cases separately. A unique match in one release does not bind
+another release or prove the command has executed.
+
+Preserve the author source. If a runnable successor uses the verified full name,
+explain that limited binding in a Stata comment and retain the input metadata
+and version evidence. Do not globally enable abbreviations or rewrite unrelated
+identifiers to make a stage pass. Keep review-only annotated files separate from
+executable stages; matching text inside a nested block comment is not an active
+command or evidence of dynamic coverage.
