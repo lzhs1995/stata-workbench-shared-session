@@ -70,8 +70,16 @@ specific failure. Retain both attempts; r(693) alone is not a disk-full diagnosi
 
 The successful recovery used the candidate's prepared files through the existing
 extension; the candidate extension itself was not installed or hot-loaded. This
-validates one saved-graph recovery, not every graph or the full nested research
-chain. Loading/drawing a private graph inside Stata does not require stealing OS
+initially validated one saved-graph recovery. A subsequent single submission
+used the audited saved DTA for the remaining 23 PNG/GPH pairs, without rerunning
+data cleaning, scores or models. All 24 PNGs decoded, were nonblank and were
+visually reviewed in a contact sheet. The 23-pair run returned 0; its data
+signature, frame, graph inventory and current-graph restoration assertions
+passed, and the same backend was ready afterward. These are bounded recovery
+checks, not pixel identity with native raster output or full candidate live
+acceptance. Preserve the original failed run separately.
+
+Loading/drawing a private graph inside Stata does not require stealing OS
 focus when the user has authorized covered or hidden Workbench execution.
 
 The shared Python client preserves a failed `_httperror` response verbatim and
