@@ -134,3 +134,68 @@ are not terminal outputs and must not be cleaned up as completed work. See
 This is operational guidance from a bounded incident and delivery audit. It
 does not install a runtime fix, certify native recovery, establish scientific
 validity or certify simultaneous execution in multiple Stata instances.
+
+## Preserve existing Mata state before table commands
+
+A shared session may already contain Mata objects created by the Workbench's
+own checkpoint code. A precondition that Mata must be empty can reject a table
+stage before any author command executes. In one recorded incident, four
+`__codex_*` objects were present; this did not establish a frozen VS Code window
+or a failure of `asdoc`. Keep the failed request and its skipped checks. A later
+diagnostic cannot retroactively certify restoration steps the failed wrapper
+did not run.
+
+Inventory existing names and protect supported Mata values, matrices, scalars,
+macros and open handles in a separate execution wrapper. Do not clear shared
+Mata or close unknown handles to satisfy a guard. The bounded successor saved
+and restored the existing ordinary objects and verified seven return markers.
+This is evidence for that inventory and wrapper, not a universal serializer for
+pointers, external resources or every possible Mata type.
+
+Stata's extended macro-list `==` comparison is order-sensitive; `===` checks
+membership irrespective of order. For an unordered name inventory use `===`,
+then separately verify each saved value and whether the name originally
+existed. A set comparison alone does not protect macro content. Match a
+versioned verifier to the exact restoration markers; preserve the execution
+receipt and add an offline verifier when marker names change, rather than
+repeating successful Stata work just to satisfy an old regex.
+
+## Separate RTF text encoding from table numbers and page layout
+
+One actual `asdoc` output declared ANSI while containing raw UTF-8 Chinese
+labels. Four original RTF files and their precision CSVs were retained. The
+successor display copies converted only non-ASCII text to standard RTF Unicode
+escapes; inverse text recovery was exact and all 124 table numbers were
+independently checked against the saved DTA. Native text readback confirmed
+readable Chinese. No new calculation was needed.
+
+Inspect the actual bytes and declarations before choosing a conversion; do not
+blindly re-encode arbitrary RTF or change its control syntax. Keep the native
+file separate from the labelled display copy and pin both hashes. Successful
+text parsing is not Word page-rendering acceptance, and rounded RTF figures
+must use their printed precision while the CSV is checked at full precision.
+
+## Keep preserve/restore boundaries and historical numbers explicit
+
+A final `save` after `restore` saves the restored dataset, not the temporary
+dataset used inside `preserve`. Audit the full boundary. If the temporary sample
+is useful for checking a table, save it as an explicitly new isolated checkpoint
+before restoration; do not pretend it was an original author output or merge
+its variables into the final panel. Keep new logging/export commands annotated.
+
+In the bounded follow-up, two saved DTA/CSV pairs contained 2,293,608 cells that
+matched independent reconstruction, and 146 returned scalars from seven
+t-tests and four contingency tables matched independent calculations. Four
+statistics differed from comments in the historical DO; those old numbers
+were retained and reported beside the new results. Matching a test calculation
+does not validate its independence assumptions for repeated panel observations
+or establish that historical R scripts adopted the regenerated data.
+
+DTA sort-list entries terminate at the first zero. Compare only active sort
+indices, not reserved trailing storage. Retain a failed offline checker and
+document its correction; do not rerun statistical work because an audit reader
+mistook unused bytes for active metadata.
+
+These additions describe observed execution and bounded checks. They do not
+install/reload the extension, certify every export path or guarantee that
+future operating-system graphics failures cannot occur.
