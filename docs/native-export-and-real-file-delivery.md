@@ -22,6 +22,64 @@ session recovery as separate statuses. Use only supported recovery on the bound
 session, and preserve failed receipts. Do not repeatedly send breaks or escalate
 to resetting shared state without the necessary recovery authority.
 
+## Follow the actual wire through nested DO files
+
+The incident also exposed a plugin coverage gap. The installed adapter prepared
+one referenced DO, but did not inspect a second DO called by that wrapper. The
+recorded request reported zero Darwin conversions and no compatibility copies;
+an offline replay of that exact wire reproduced those diagnostics. Recursive
+preparation reached the 24 raster exports in the inner export file. This ties
+the compatibility gap to the failed request without claiming that VS Code as
+a whole stopped responding or that the underlying Java/AWT defect is fixed.
+
+The adapter now prepares literal, double-quoted `.do` references recursively on
+macOS, writing temporary execution copies from child to parent. It preserves
+the author's source bytes and path-token surrounding text. Commented and quoted
+examples, including multiline compound strings, are not DO commands. Retain
+`sourceCompatibility` and `darwinCompatibility` from the same request as its
+wire, cwd, source hashes, and prepared copy hashes.
+
+This is a bounded static scanner, not a Stata interpreter:
+
+- Only line-start `do` with optional capture/quietly/noisily prefixes is followed.
+  Macro paths, `run`, `include`, and semicolon-delimited references are reported
+  as `partial-static` and retained; other dynamic command forms are not certified.
+- A changed or uncertain working directory prevents guessing relative DO paths.
+  Use explicit absolute paths in an isolated execution wrapper when needed.
+- Missing literal files, cycles, more than 16 nested files, 256 reference visits,
+  or 16 MiB cumulative source reads fail preparation. A literal file generated
+  later at run time must be split into a separately prepared stage after it exists.
+- A descendant conversion failure rejects the complete prepared submission;
+  `capture do` cannot hide that failure and continue the rest of the wrapper.
+- Unsupported dynamic references are not a complete graph safety guarantee.
+  Inspect/materialize the actual export DO before using that route for raster
+  export. Do not send native PNG probes into an occupied research session.
+
+SVG plus the macOS converter avoids this observed native raster path, but is
+not a claim of pixel identity with Stata's native PNG rendering. Source tests,
+package dependency tests, installed code, loaded code, and real graph output
+must each be evidenced separately. Offline conversion of a DO is not a graph.
+
+A bounded recovery on the existing Workbench successfully reloaded a saved GPH
+and exported it through a frozen, preconverted SVG/converter DO: Stata returned
+0 and produced a decoded, nonblank 1200 × 800 RGB PNG (93,621 bytes). No data or
+model was recalculated. The earlier recovery attempt used `graph use ..., nodraw`
+and failed at SVG export with `could not find Graph window`, r(693), before the
+converter ran. Removing `nodraw` in a new isolated recovery copy resolved that
+specific failure. Retain both attempts; r(693) alone is not a disk-full diagnosis.
+
+The successful recovery used the candidate's prepared files through the existing
+extension; the candidate extension itself was not installed or hot-loaded. This
+validates one saved-graph recovery, not every graph or the full nested research
+chain. Loading/drawing a private graph inside Stata does not require stealing OS
+focus when the user has authorized covered or hidden Workbench execution.
+
+The shared Python client preserves a failed `_httperror` response verbatim and
+extracts its run/request identity and return code into a separate diagnostic
+file. Conflicting envelope fields are not combined. HTTP errors remain failed
+even if nested or top-level fields look successful, and a missing ID never
+authorizes a retry. Record HTTP settlement and native termination separately.
+
 ## Export data before independent graph stages
 
 Save data checkpoints before graph conversion. Put precision CSV exports in a
