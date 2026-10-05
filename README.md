@@ -1,6 +1,6 @@
 # Stata Workbench Shared Session
 
-Toolchain guide revision **2026-10-01**: [explicit shared execution, permitted hiding and concurrency](docs/shared-execution-and-concurrency.md), plus [research handoff and archive lessons](docs/empirical-review-and-archive.md). Documentation changes leave public runtime **0.1.3-rc.7.39** unchanged; they do not certify a candidate protocol or require a running backend restart.
+Toolchain guide revision **2026-10-01**: [explicit shared execution, permitted hiding and concurrency](docs/shared-execution-and-concurrency.md), plus [research handoff and archive lessons](docs/empirical-review-and-archive.md). The published public runtime remains **0.1.3-rc.7.39**. This branch is **0.1.3-rc.7.44-dev.1**, a candidate recursive DO/PNG compatibility fix, not installed or covered by historical FULL45 acceptance. See [candidate scope](docs/ACCEPTANCE.md#recursive-do-candidate).
 
 A VS Code extension for a visible Stata session shared sequentially by a human
 and AI agents. Human Run File/Selection and agent commands use the same backend,
