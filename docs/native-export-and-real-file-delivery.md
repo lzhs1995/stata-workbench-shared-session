@@ -247,3 +247,21 @@ do not establish every-pixel or historical/native-PNG identity. This larger
 batch demonstrates that recovery route only; it neither installs the candidate
 extension nor permanently fixes native Java/AWT initialization or certifies
 multiple simultaneous Stata backends.
+
+
+## Preserve installed repairs when preparing a new candidate
+
+Before installation, compare the actual installed bundle and runtime modules
+with the candidate, not just version numbers or a green pull-request check.
+In this release review, the recursive-export candidate initially omitted the
+installed finalizer, bounded Terminal history, source-column/graph routing and
+log-tail yielding repairs. Installing it would have reverted those changes.
+
+The maintenance replay now includes all four installed patch modules and the
+finalizer return-code parser. Their behavioral regressions run in the release
+check, while the candidate retains recursive DO preparation and its isolated
+package dependency tests. The rebuilt bundle matches the installed bundle; the
+new export behavior resides in the separately pinned compatibility modules.
+Verify both bundle and module hashes inside the final VSIX. These offline
+checks do not prove that an existing VS Code host has loaded the candidate or
+that its actual graph/table output passes live acceptance.
