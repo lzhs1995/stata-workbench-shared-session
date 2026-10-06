@@ -199,3 +199,51 @@ mistook unused bytes for active metadata.
 These additions describe observed execution and bounded checks. They do not
 install/reload the extension, certify every export path or guarantee that
 future operating-system graphics failures cannot occur.
+
+## Preserve column order, coding direction and stored precision
+
+`keep` selects variables without necessarily reordering them. If a supplemental
+DTA must match an author's CSV column list, use a separately annotated `order`
+after `keep`; verify the ordered names as well as all values. A recode before
+`preserve` remains in force after `restore`. Trace the actual sequence before
+assuming a later graph or export still uses the original categories.
+
+In one bounded comparison, the current source collapsed seven frequency
+categories to five before a positive linear transformation. Historical exports
+instead matched a seven-category reverse transformation after float32 storage.
+That finding identifies a reproducible value relationship, not the unknown
+historical executed program. Retain the author track and report the difference;
+do not silently change it to force equality with a same-named historical file.
+
+Report CSV text equality, full stored-value equality and float32 roundtrip
+separately. A default CSV can look close yet fail roundtrip for a few cells;
+a precision CSV checked against every saved DTA cell resolves export loss,
+not a category/direction mismatch. Same-name DTA files can have different row
+counts, columns and versions. Compare common keys and unmatched rows, including
+literal string IDs; actual differences between two string IDs are not merely a
+numeric display-format issue. Do not expose individual identifiers in public
+experience reports.
+
+Rank ties can leave a percentile-defined low group empty. Preserve the author's
+missing result and report it instead of splitting ties to manufacture a group.
+Reconstruct calculations using the actual float/double storage at each step:
+rounding a transformed score can create ties that unrounded arithmetic lacks.
+Execution agreement does not validate a claimed scientific property of a score.
+
+## Larger graph batches remain bounded output checks
+
+A later single request read an already audited checkpoint and produced 84 PNG
+and 84 native GPH files, expanding four author plotting statements across 21
+variables and performing seven display commands. Frozen SVG/converter copies
+provided raster export; no data cleaning, scoring or model was repeated. All
+PNG files decoded and all seven contact sheets were visually inspected. Eight
+recorded restoration checks passed and the same backend was ready afterward.
+
+Keep graph filenames and author titles; use private in-memory graph names.
+Record expanded-command coverage, original and prepared source hashes, native
+terminal evidence and the exact scope of restoration. Native GPH headers plus
+successful saves do not establish separate reload acceptance. Contact sheets
+do not establish every-pixel or historical/native-PNG identity. This larger
+batch demonstrates that recovery route only; it neither installs the candidate
+extension nor permanently fixes native Java/AWT initialization or certifies
+multiple simultaneous Stata backends.
