@@ -190,7 +190,7 @@ python3 tools/shared_stata.py --code 'scalar public_shared_demo = public_shared_
 - **圖形。** 點開的預覽會用這一張圖替換目前顯示的這批圖；其他匯出檔案仍可從 Terminal 裡的
   連結和磁碟上找到。沒有開啟 Graphs 面板時，自動出圖的批次讓 Terminal 保持可見。
 - **Data Browser。** 顯示行、變數和目前 frame（例如 `wb_platform`）。frame 名在瀏覽器開啟時讀取。
-- **Stop。** soft Stop 取消目前執行、排空任務，backend 不變。Terminal 會顯範例如
+- **Stop。** soft Stop 取消目前執行、排空任務，backend 不變。Terminal 會顯示例如
   `human-file cancelled by soft Stop (generation 1)`，`/status` 報
   `resetGenerationKind: "soft-stop"`。如果 Stop 落在執行還在儲存執行前 checkpoint 的時候，
   執行在你的程式碼開始前就停下：正文不會發出（`payloadDispatched: false`；HTTP 409
