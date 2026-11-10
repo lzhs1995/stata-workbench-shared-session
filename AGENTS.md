@@ -62,8 +62,10 @@ python3 -B tools/verify_release.py
 ## What has been checked with agents
 
 - Reading: with no prior context, a Claude Code subagent and a Codex session each
-  read only SKILL.md and answered a 10-question operating test (19/20 and 17/20;
-  pass line 16, no zero on the safety questions), 2026-10-31 and 2026-11-01.
+  read SKILL.md and its linked references within the skill directory and answered
+  a 10-question operating test (19/20 and 17/20; pass line 16, no zero on the safety
+  questions), 2026-10-31 and 2026-11-01. These were skill dev.7 reading tests,
+  not dev.8 live execution tests.
 - Running: the agent client `tools/shared_stata.py` was exercised on rc.7.45 on
   macOS and Windows; see [README.md](README.md#platform-status).
 - Not checked: live runs started by each named agent product through an

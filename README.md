@@ -8,6 +8,23 @@ A VS Code extension that lets a person and AI agents use one visible Stata
 session in turn. Both send code to the same backend, so data, macros, scalars,
 results and graphs are shared.
 
+<!-- portfolio-stata-navigation-20261110 -->
+## Project family · 專案導覽
+
+| Repository | Role · 角色 |
+| --- | --- |
+| [Shared Session](https://github.com/lzhs1995/stata-workbench-shared-session) | Current runtime line and versioned releases · 現役執行環境與版本發行 |
+| [Operating skill](https://github.com/lzhs1995/stata-workbench-shared-session-skill) | Separately versioned agent guidance and runtime compatibility checks · 獨立版本的代理操作指南與執行環境相容檢查 |
+| [Next](https://github.com/lzhs1995/stata-workbench-next) | Preview development line with isolated profiles and ports · 使用獨立設定與連接埠的開發預覽版 |
+
+These repositories have different roles and release cycles. Use the runtime and
+skill versions named by their compatibility records; Next remains a separate
+preview and does not replace an existing research session.
+
+三個倉庫各自維護版本。請依相容紀錄選用執行環境與操作技能；Next 為獨立預覽版，
+不會取代現有的研究工作階段。
+<!-- /portfolio-stata-navigation-20261110 -->
+
 ## What it is
 
 - In the editor: **Run Current File**, **Run Selection/Current Line**, the
