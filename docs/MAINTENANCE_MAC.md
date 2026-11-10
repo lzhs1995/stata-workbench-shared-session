@@ -2,7 +2,7 @@
 
 # Stata Workbench Shared Session — Mac 维护手册
 
-本文件是 Windows 维护手册（`示例工作区/Stata_Workbench_协作执行与补丁说明.md`）的 Mac 对应版。
+本文件是历史 Windows 维护说明的 Mac 对应版；通用维护流程见 [MAINTENANCE](MAINTENANCE.md)。
 面向后续接手的 Claude Code / Codex / 人类操作者。
 
 ## rc.7.10.33 transport log 与内部 graph noise（2026-08-04）
@@ -107,10 +107,10 @@ macOS 在 reopen 时可能恢复两个 VS Code 窗口并并行激活两个 Exten
 > ⚠️ 关键区分：`0.1.2-gold`（5431818，三补丁，唯一可用）≠ `0.1.2-uishared-fix`（5429031，缺可见通道补丁，已弃）。
 > 装错后者会补上 ui-shared 治乱码，但丢掉压力测试依赖的 visible-bridge 补丁。认字节数 / marker，别只认版本号。
 
-金包完整性自检：
+历史金包完整性自检（把 `/path/to/stata-workbench-shared-session` 换成自己的仓库根目录）：
 
 ```bash
-V="$HOME/Documents/example-project/tasks/07_Stata-workbench/stata-workbench-shared-session/stata-workbench-shared-session-0.1.2-gold.vsix"
+V="/path/to/stata-workbench-shared-session/stata-workbench-shared-session-0.1.2-gold.vsix"
 unzip -p "$V" extension/dist/ui-shared/main.js | shasum -a 256   # 期望 eb11a74c…1ae91cf4
 unzip -l "$V" | grep -E 'ui-shared|extension.js'                  # 应见 dist/extension.js 5431818 + 全 ui-shared
 ```
@@ -232,8 +232,8 @@ node_modules/.bin/esbuild src/ui-shared/data-browser.js \
 
 Token must be obtained from the local installation, never from this repository:
 
-- Set `STATA_BRIDGE_TOKEN` locally for authenticated maintenance endpoints.
-- 17486 → `REDACTED_HISTORICAL_CREDENTIAL`
+- For authenticated maintenance endpoints, use the selected local session's configured token through `STATA_BRIDGE_TOKEN` in its local maintenance environment.
+- Never paste the token value into documentation, commits or public reports. Removing a literal from this document does not remove historical commits or released archives.
 - `/run-command` 无 token 鉴权。
 
 ---
