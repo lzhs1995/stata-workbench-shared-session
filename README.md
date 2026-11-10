@@ -1,6 +1,8 @@
 # Stata Workbench Shared Session
 
-[English](README.md) | [中文](README.zh-CN.md)
+<img src="media/icon.png" alt="Stata Workbench Shared Session logo" width="96">
+
+English | [简体中文](README.zh-CN.md) | [繁體中文](README.zh-TW.md)
 
 A VS Code extension that lets a person and AI agents use one visible Stata
 session in turn. Both send code to the same backend, so data, macros, scalars,
@@ -53,6 +55,7 @@ line says otherwise.
 
 ### Documentation
 
+- For agents: [AGENTS.md](AGENTS.md); the operating rules are in [stata-workbench-shared-session-skill](https://github.com/lzhs1995/stata-workbench-shared-session-skill)
 - [Cross-platform development and configuration](docs/CROSS_PLATFORM.md)
 - [Windows physical-machine runbook](docs/WINDOWS_ACCEPTANCE.md) and [early Windows tooling](docs/LEGACY_WINDOWS.md)
 - [Capability and evidence ledger](SYNC.md) and [acceptance scope](docs/ACCEPTANCE.md)

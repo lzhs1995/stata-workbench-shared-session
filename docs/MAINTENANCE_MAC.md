@@ -63,7 +63,7 @@ macOS 在 reopen 时可能恢复两个 VS Code 窗口并并行激活两个 Exten
 > **单一代码库（`dist/extension.js` 一份）+ OS 适配层**。真正与操作系统相关的差异只有三类，
 > 全部靠 `process.platform` 或独立脚本目录隔离，核心业务逻辑永远只维护一份：
 >
-> 1. **路径**：Windows 硬编码盘符（`C:\Users\LZHS\...`）→ Mac 家目录 / `/var/folders/...` 临时目录。
+> 1. **路径**：Windows 硬编码盘符（`C:\Users\<user>\...`）→ Mac 家目录 / `/var/folders/...` 临时目录。
 > 2. **运维脚本**：`scripts/*.ps1` / `*.cmd`（Windows）↔ 未来的 `scripts/mac/*.sh`（Mac）。
 > 3. **打包完整性**：见下方“§0 终端乱码根因”。这是本手册创建的直接原因。
 >
@@ -270,7 +270,7 @@ vector **SVG / PDF 路径健康**。规避方案（已端到端验证）：
 
 ## §4 Mac 特有的坑
 
-1. **源 do-file 硬编码 Windows 路径**（`C:/Users/LZHS/...`）→ Mac 上命中 `r(603)` 当场中止，
+1. **源 do-file 硬编码 Windows 路径**（`C:/Users/<user>/...`）→ Mac 上命中 `r(603)` 当场中止，
    **不是桥问题**。必须跑改写成 Mac 路径的 tmpdo 版本。
 2. **HTTP 500 / rc=-1 可能是传输 blip**，Stata 其实仍落盘干完。判成败必查**落盘产物**，
    判真假完成必抓 `lastRun.rc` + `ok` + `stdout` 尾。
