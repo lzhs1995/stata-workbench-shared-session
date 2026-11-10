@@ -1,6 +1,8 @@
 # Stata Workbench Shared Session
 
-[English](README.md) | [中文](README.zh-CN.md)
+<img src="media/icon.png" alt="Stata Workbench Shared Session 标志" width="96">
+
+[English](README.md) | 简体中文 | [繁體中文](README.zh-TW.md)
 
 这是一个 VS Code 扩展：人和 AI agent 轮流使用同一个可见的 Stata 会话。双方的代码
 都送到同一个 backend，所以数据、宏、scalar、结果和图形是共享的。
@@ -31,6 +33,7 @@
 
 ### 文档
 
+- 给 agent：[AGENTS.md](AGENTS.md)；操作规则以 [stata-workbench-shared-session-skill](https://github.com/lzhs1995/stata-workbench-shared-session-skill) 为准
 - [跨平台开发与配置](docs/CROSS_PLATFORM.md)
 - [Windows 实机验收手册](docs/WINDOWS_ACCEPTANCE.md)、[早期 Windows 工具的去向](docs/LEGACY_WINDOWS.md)
 - [能力与证据台账](SYNC.md)、[验收范围](docs/ACCEPTANCE.md)
