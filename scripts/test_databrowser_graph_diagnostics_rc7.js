@@ -11,18 +11,20 @@ const distDataBrowser = fs.readFileSync(path.join(__dirname, "..", "dist", "ui-s
 
 assert.ok(extension.includes("codex patch rc.7: Data Browser observable readiness"));
 assert.ok(extension.includes("codex patch rc.7: debug Data Browser readiness"));
-assert.ok(extension.includes("codex patch rc.7: mcp-stata Data Browser listener-loop patch"));
-// Activation now forwards the configured environment and explicit runtime root.
-// Its execution and refusal behavior are covered by test_activation_isolation.js.
-assert.ok(extension.includes("__runtimePatcher.runtimeOptionsFromConfig(E,uM())"));
-assert.ok(extension.includes("__runtimePatcher.patchRuntime(__runtimeOptions)"));
-assert.ok(extension.includes("codex patch rc.7.10.27: patch live uvx runtime"));
+// Final ordinary-window activation is lazy; preparation patches only its private runtime.
+assert.ok(extension.includes('window_session_vscode.js'));
+assert.ok(!extension.includes("__runtimePatcher.patchRuntime(__runtimeOptions)"));
+const windowAdapter = fs.readFileSync(path.join(__dirname, "window_session_vscode.js"), "utf8");
+const windowCore = fs.readFileSync(path.join(__dirname, "window_session_core.js"), "utf8");
+assert.ok(windowAdapter.includes('require("./mcp_stata_runtime_patch").patchRuntime(input)'));
+assert.ok(windowCore.includes('await options.patchRuntime({ runtimeRoot: runtime, env: { ...env, ...childEnv } })'));
+assert.ok(windowCore.includes('RUNTIME_PATCH_FAILED'));
 assert.ok(extension.includes("codex patch rc.7.10.11: Data Browser channel recovery"));
 assert.ok(extension.includes("codex patch rc.7.10.12: exact Data Browser readiness"));
 assert.ok(extension.includes("codex patch rc.7.10.13: fresh Data Browser command completion"));
 assert.ok(extension.includes("codex patch rc.7.10.14: Data Browser variable integrity"));
 assert.ok(extension.includes("codex patch rc.7.40: post-run summary uses cached Data Browser credentials"));
-assert.ok(extension.includes("mcp_stata_runtime_patch.js"));
+assert.ok(extension.includes("../scripts/mcp_stata_runtime_patch"));
 assert.ok(extension.includes("dataBrowser:globalThis.__codexDataBrowserStatus||null"));
 assert.ok(extension.includes("lastArrowBytes"));
 assert.ok(extension.includes("rowCount"));

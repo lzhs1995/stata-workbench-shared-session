@@ -9,16 +9,19 @@ const vm = require("node:vm");
 const runtime = require("./mcp_stata_runtime_patch");
 const patch = require("./apply_activation_isolation_patch");
 const source = fs.readFileSync(path.join(__dirname, "../dist/extension.js"), "utf8");
+const daily = require("./test_daily_bundle_helpers");
+const historical = daily.beforeDaily(source);
 const cases = [];
 function check(name, fn) { fn(); cases.push(name); }
-function between(start, end) {
+function between(start, end, sourceText = source) {
+  const source = sourceText;
   const at = source.indexOf(start);
   assert.ok(at >= 0 && source.indexOf(start, at + 1) < 0, "unique start: " + start);
   const to = source.indexOf(end, at + start.length);
   assert.ok(to > at, "end: " + end);
   return source.slice(at, to);
 }
-function integrationRun(text, settings, available = true) {
+function integrationRun(text, settings, available = true, ordinary = false) {
   const calls = [];
   const sandbox = {
     iA: { workspace: { getConfiguration: () => ({ get: (key, fallback) => settings[key] ?? fallback }) } },
@@ -26,7 +29,7 @@ function integrationRun(text, settings, available = true) {
     ORA: () => calls.push("claudeWrite"), xRA: () => calls.push("claudeDelete"),
     vRA: () => { calls.push("codexPathRead"); return {}; }, mHg: () => ({}),
     JF: () => false, jRA: () => calls.push("codexWrite"), VRA: () => calls.push("codexDelete"),
-    JI: "uvx", Kg: "test", zg: {},
+    JI: "uvx", Kg: "test", zg: {}, __codexWindowSession: ordinary ? {} : null,
   };
   vm.runInNewContext(text + ";FF({});", sandbox);
   return calls;
@@ -45,9 +48,12 @@ check("old activation deletion is detected by the same harness", () => {
   const oldCalls = integrationRun(patch.OLD_FF, {});
   assert.ok(oldCalls.includes("claudeDelete") && oldCalls.includes("codexDelete"));
 });
-check("maintained patch is idempotent and rejects ambiguous anchors", () => {
-  assert.equal(patch.patchBundle(source), source);
-  assert.throws(() => patch.patchBundle(source + patch.NEW_FF), /ambiguous/);
+check("ordinary activation suppresses optional global integrations", () => {
+  assert.deepEqual(integrationRun(ff, { configureClaudeCode: true, configureCodex: true }, true, true), []);
+});
+check("historical activation-isolation layer is idempotent and rejects ambiguous anchors", () => {
+  assert.equal(patch.patchBundle(historical), historical);
+  assert.throws(() => patch.patchBundle(historical + patch.NEW_FF), /ambiguous/);
 });
 check("shared maintenance replay restores activation isolation and remains idempotent", () => {
   const target = path.join(__dirname, "../dist/extension.js");
@@ -63,7 +69,7 @@ check("shared maintenance replay restores activation isolation and remains idemp
     assert.equal(typeof output, "string");
     return output;
   }
-  let old = source;
+  let old = historical;
   for (const [before, after] of [...patch.REPLACEMENTS].reverse()) old = old.replace(after, before);
   assert.ok(!old.includes(patch.MARKER));
   assert.equal(run(old), source);
@@ -192,7 +198,8 @@ try {
     vm.runInNewContext(functions + ';if(qRA()!=="configured"||$_()!==null)throw Error("unexpected result")', context);
   });
 
-  const activation = between("let E=zg.getServerConfig({hostOnly:!0});", 'if(HF(Io?"missing":"idle")');
+  // Historical eager-activation behavior only; final activation is lazy below.
+  const activation = between("let E=zg.getServerConfig({hostOnly:!0});", 'if(HF(Io?"missing":"idle")', historical);
   function activate(config, result, preflight = true) {
     const calls = [];
     const context = { zg: { getServerConfig: () => config }, uM: () => ({}), rg: path,
@@ -206,20 +213,39 @@ try {
     vm.runInNewContext(activation, context);
     return calls;
   }
-  check("activation passes config env and skips uv version and refresh for explicit runtime", () => {
+  check("historical eager activation passes explicit config and skips uv refresh", () => {
     const calls = activate(entry, { ok: true });
     assert.equal(calls[0].env.MCP_STATA_RUNTIME_ROOT, explicit);
     assert.deepEqual(calls.slice(1), ["configure"]);
   });
-  check("activation stops when explicit patch or command preflight fails", () => {
+  check("historical eager activation refuses failed explicit patch or preflight", () => {
     assert.throws(() => activate(entry, { ok: false, status: "not-found" }), /unavailable/);
     assert.throws(() => activate(entry, { ok: true }, false), /refusing default/);
   });
-  check("default activation retains version and deferred refresh behavior", () => {
+  check("historical default eager activation retains version and deferred refresh", () => {
     const calls = activate({ command: "uvx", env: {} }, { ok: false, status: "not-found" });
     assert.deepEqual(calls.slice(1), ["version-discovery", "configure", "refresh-scheduled", "refresh"]);
   });
 } finally { fs.rmSync(temp, { recursive: true, force: true }); }
+
+check("final ordinary-window startup is lazy unless explicitly enabled", () => {
+  const startup = between("JI=UF();Io=!1;", ",g.subscriptions.push(iA.workspace.onDidChangeConfiguration");
+  for (const enabled of [undefined, false, true]) {
+    let connections = 0;
+    const status = [];
+    const settings = { get: (key, fallback) => {
+      assert.equal(key, "loadStataOnStartup");
+      assert.equal(fallback, false);
+      return enabled ?? fallback;
+    } };
+    vm.runInNewContext(startup + "){}", {
+      A: settings, UF: () => "uvx", HF: value => status.push(value),
+      zg: { connect: () => { connections++; return Promise.resolve(); } },
+    });
+    assert.equal(connections, enabled === true ? 1 : 0);
+    assert.deepEqual(status, ["idle"]);
+  }
+});
 
 async function clientChecks() {
   const clientMethod = between("async _createClient(){", "async _refreshToolList(A){");
@@ -251,6 +277,7 @@ async function clientChecks() {
     Object.assign(client, { _loadServerConfig: () => ({ command: explicit ? "/isolated/bin/python" : "uvx", env: {} }),
       _requiredToolNames: () => new Set(["required"]), _log: () => {}, _resetClientState: () => {},
       _transport: { close: async () => { closed++; } } });
+    daily.attachLifecycle(client);
     await client._ensureLatestServerForMissingTool("required");
     assert.equal(closed, explicit ? 0 : 1);
     assert.equal(client._forceLatestServer, explicit ? undefined : true);

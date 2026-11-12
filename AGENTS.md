@@ -1,72 +1,124 @@
-# AGENTS.md
+# Agent entry point — Stata Workbench Shared Session 0.2.0
 
-Entry point for AI agents and for the people who set them up. Instructions are
-plain Markdown and do not depend on one vendor's agent.
+**0.2.0 is a candidate undergoing delivery, not a released or live-accepted
+daily package.** These instructions target extension ID
+`lzhs1995.stata-workbench-shared-session`. They apply to shell-capable agents;
+they do not establish that Codex, Claude Code or another host has completed
+actual-host acceptance.
 
-## Pick your task
+## Install and select the person's window
 
-| You want to | Read |
-| --- | --- |
-| Run Stata code in a person's existing session, so you and the person share one visible Stata | The operating skill (below). It is the authority for this route |
-| Change this repository (extension runtime, tools, docs) | [Changing this repository](#changing-this-repository) and [CONTRIBUTING.md](CONTRIBUTING.md) |
-| Install the extension for a person | [README.md](README.md#install) ([简体中文](README.zh-CN.md#安装), [繁體中文](README.zh-TW.md#安裝)) |
+Read [README](README.md) ([简体中文](README.zh-CN.md),
+[繁體中文](README.zh-TW.md)) and [the daily agent workflow](docs/agent-daily-workflow.md).
+Use a locally supplied, reviewed 0.2.0 VSIX and its matching installed tools.
+There is no asserted public 0.2.0 download URL yet. The separately versioned
+[operating skill](https://github.com/lzhs1995/stata-workbench-shared-session-skill)
+must explicitly match the installed build before use; an rc.7.45 or Next pin
+does not certify this candidate.
 
-## Running Stata in a person's session
+The person opens a local project in an ordinary VS Code window and manually
+runs **Stata: Start Shared Session**. Keep `stataMcp.loadStataOnStartup` false,
+including any inherited user/workspace setting. An unrelated window must not
+start Stata. Up to **two** independent ordinary-window sessions are supported,
+including two windows using the same VS Code profile. People and agents take
+turns within each session. Do not launch a replacement to bypass a refusal.
 
-Read the operating skill first:
-[stata-workbench-shared-session-skill](https://github.com/lzhs1995/stata-workbench-shared-session-skill),
-file `skills/stata-workbench-shared-session/SKILL.md`. It matches runtime
-`v0.1.3-rc.7.45`; the pins are in that repository's `runtime-compatibility.json`.
-Its `scripts/install.py` (dry run by default) can link the skill into
-`.claude/skills`, `.codex/skills` and `.agents/skills`. Any other agent can read
-SKILL.md directly.
+The registry default is `~/.stata-workbench/sessions/`, under
+`STATA_WORKBENCH_HOME` when explicitly configured. VS Code and the shell must
+use the same root. Do not inherit `STATA_WORKBENCH_NEXT_HOME` for this workflow;
+the legacy launcher is not the daily startup route.
 
-The rules that matter most, in short. SKILL.md has the full text:
-
-- Use the person's existing session. The tools in `tools/` come from a clone of
-  this repository checked out at the tag of the installed VSIX.
-- Set `STATA_WORKBENCH_PROFILE` and `STATA_WORKBENCH_PORT` to the person's real
-  profile and port. The README values are only defaults.
-- Check first: `python3 -B tools/verified_workbench.py --status`. Then run with
-  `python3 -B tools/shared_stata.py --file <saved .do> --cwd <dir>`
-  (Windows: `python`). One POST per call; the client never retries.
-- Exit 0 means verdict `PASS_VISIBLE_SHARED_RUN`. `EXECUTION_UNCONFIRMED_NO_RETRY`
-  does not mean "did not run": read the receipt before doing anything else and
-  never resend that call.
-- Never start a second Stata, backend or VS Code profile to get around a busy,
-  STALE or missing session. Never kill Stata. Call `/force-reset` or
-  `/panic-kill` only when the person asks for it.
-- Do not save or discard the person's unsaved edits. Do not commit
-  `.stata-receipts/`, research data, logs or credentials.
-
-## Changing this repository
-
-Offline checks (no Stata, GUI or credentials needed):
+macOS shell, with the Code CLI on PATH and the reviewed extension installed in
+the profile being used:
 
 ```sh
-npm ci --ignore-scripts
-npm run check
-python3 -B -m unittest discover -s tools -p 'test_*.py'
-python3 -B tools/verify_release.py
+WB_EXTENSION="$(code --locate-extension lzhs1995.stata-workbench-shared-session)"
+WB_AGENT="$WB_EXTENSION/tools/workbench_agent.py"
+python3 -B "$WB_AGENT" sessions
+python3 -B "$WB_AGENT" status --session SESSION_ID
 ```
 
-- `npm run check` is read-only. `check:legacy` rewrites files; never run it on a
-  sealed release candidate.
-- `dist/extension.js`, `scripts/` and `tools/` files listed in
-  `release/runtime-manifest.json` are the runtime identity. Changing them needs a
-  new version and new licensed acceptance on macOS and Windows; see
-  [docs/RELEASE.md](docs/RELEASE.md).
-- Keep upstream attribution ([NOTICE](NOTICE)). Use synthetic data in tests and
-  examples; never add personal paths, research files or receipts.
+Replace `SESSION_ID` with the exact ID for the person's workspace/window.
+Windows discovery and equivalent PowerShell commands are in the daily guide.
+Use that ID throughout the task, not whichever port answers. Identity or
+bundle mismatches refuse execution; never bypass them or redirect to another
+window. Tokens stay in the private registry and must not be copied into source
+or public receipts.
 
-## What has been checked with agents
+## Run once, observe and honor Stop
 
-- Reading: with no prior context, a Claude Code subagent and a Codex session each
-  read SKILL.md and its linked references within the skill directory and answered
-  a 10-question operating test (19/20 and 17/20; pass line 16, no zero on the safety
-  questions), 2026-10-31 and 2026-11-01. These were skill dev.7 reading tests,
-  not dev.8 live execution tests.
-- Running: the agent client `tools/shared_stata.py` was exercised on rc.7.45 on
-  macOS and Windows; see [README.md](README.md#platform-status).
-- Not checked: live runs started by each named agent product through an
-  installed skill route, and agents other than Claude Code and Codex.
+Use saved Stata source inside that window's workspace, an existing working
+directory, and a new workflow directory for every run:
+
+```sh
+python3 -B "$WB_AGENT" run --session SESSION_ID --file /abs/project/stage01.do --cwd /abs/project --workflow-dir /abs/receipts/stage01 --agent-name Codex
+python3 -B "$WB_AGENT" status --workflow /abs/receipts/stage01
+python3 -B "$WB_AGENT" reconcile --workflow /abs/receipts/stage01
+```
+
+Claude Code uses `--agent-name 'Claude Code'`. `run` starts a detached local
+worker and returns; retain its workflow path and keep observing. CLI exit 0
+alone is not execution success. Require the original receipt verdict
+`PASS_VISIBLE_SHARED_RUN`, then inspect output and deliverables. A timeout,
+missing run or idle window does not prove that nothing ran. Never resubmit an
+`EXECUTION_UNCONFIRMED_NO_RETRY` run. A confirmed Stata error may follow partial
+execution; inspect its `stataRc` and state before further work.
+
+On a fresh user instruction to stop:
+
+```sh
+python3 -B "$WB_AGENT" stop --workflow /abs/receipts/stage01 --user-action 'stop it'
+python3 -B "$WB_AGENT" reconcile --workflow /abs/receipts/stage01
+```
+
+Wait for confirmed pause/restoration and readiness of the same session.
+External file writes are not rolled back. Native host cancellation is not a
+Workbench Stop; its worker can remain active. The daily guide explains the
+bounded original-run Stop claim and lost-response handling. Do not replay
+execution or continue automatically. Recovery-required status is a refusal;
+KILL may lose in-memory data and requires the person's informed confirmation.
+
+## Human review of source changes
+
+For `.do`, `.ado` and `.mata`, write proposed content to a separate proposal
+file, not to the target. Use the bundled subcommand:
+
+```sh
+python3 -B "$WB_AGENT" propose-edit --workflow /abs/receipts/stage01 --content-file /abs/proposals/stage01-proposed.txt --reason 'Apply the requested model change'
+python3 -B "$WB_AGENT" reconcile --workflow /abs/receipts/stage01 --proposal-id RETURNED_PROPOSAL_ID
+```
+
+This proposes an edit to the workflow's original source file. The person
+reviews the immutable diff and selects **Accept** or **Reject**. Dirty buffers,
+changed document versions/file hashes, expiry and session changes invalidate
+acceptance. Preserve the person's edits, let them save, then propose again.
+Never use direct Edit/Write/apply_patch or shell redirection on the target to
+bypass the gate. This host rule is not an OS write sandbox.
+
+**Accept only writes the file. It never executes or authorizes continuation.**
+A fresh user continuation instruction must select the saved stage explicitly:
+
+```sh
+python3 -B "$WB_AGENT" continue --workflow /abs/receipts/stage01 --file /abs/project/stage03.do --workflow-dir /abs/receipts/stage03-continued --user-action 'Continue only the saved stage03.do'
+```
+
+`continue` requires the confirmed paused parent, the same ready session and no
+intervening completed run. It runs the selected file from its beginning using
+the parent's working directory; it does not infer a line or default to the old
+file. Submit multi-stage work one saved stage at a time and inspect each receipt.
+An unsaved future-stage edit must be resolved by the person before that stage.
+
+## Repository work and evidence limits
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) and [Development](README.md#development).
+Use synthetic fixtures and preserve [upstream attribution](NOTICE). A docs-only
+task must not regenerate bundles, pins or manifests. Check changed Markdown
+links, examples against the CLI parser and `git diff --check`. Runtime release
+checks and licensed live acceptance belong to separately scoped work.
+
+The README's [platform results](README.md#platform-test-results) are historical
+Next builds using isolated profiles. They do not validate the ordinary-window
+0.2.0 candidate, human interaction or actual agent discovery. No native
+Codex/Claude Stop/diff/continue hooks are installed by these instructions.
+Preserve private workflow receipts and original attempts; do not commit research
+data, registry tokens, logs or `.stata-receipts/`.

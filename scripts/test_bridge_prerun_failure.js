@@ -62,6 +62,7 @@ async function run(mode, expected, options = {}) {
   };
   const stateMap = new Map();
   context = {
+    __codexWindowTempDir: dir,
     __run: "fixture", __runId: "request-fixture", __cwd: dir, __patch: "test", __res: {},
     require: name => name === "node:os" ? { tmpdir: () => dir } : require(name),
     __codexStopCheckpointRef: coreRef,

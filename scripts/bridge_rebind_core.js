@@ -62,6 +62,11 @@ function createBridgeBinder(options = {}) {
   function handleListening() {
     pendingListeningHandler = null;
     if (disposed) return;
+    // Port 0 lets the OS atomically allocate a distinct loopback port per window.
+    if (typeof server.address === "function") {
+      const address = server.address();
+      if (address && typeof address === "object") state.port = address.port;
+    }
     state.bound = true;
     state.exhausted = false;
     state.lastError = null;

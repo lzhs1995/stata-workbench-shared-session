@@ -281,11 +281,11 @@ function main() {
       .forEach((c) => { k[c.guardKind] = (k[c.guardKind] || 0) + 1; });
     assert.deepStrictEqual(k, { guardWrap: 12, guardStage: 2, guardProgress: 1 }, "分布不符：" + JSON.stringify(k));
   });
-  t("B.3 重放产物落地前是 UNFINALIZED（槽位仍为 64 个 0）", () => {
+  t("B.3 daily replay writes a valid final identity; any later byte mutation is rejected", () => {
     const src = fs.readFileSync(results[0].distPath, "utf8");
-    const slot = FIN.locateSlot(src);
-    assert.strictEqual(slot.value, FIN.ZERO_SLOT,
-      "重放产物槽位竟已被写值——finalize 不该发生在补丁里");
+    assert.strictEqual(FIN.verify(src).ok, true, "daily replay finalizes after all registered layers");
+    assert.notStrictEqual(FIN.locateSlot(src).value, FIN.ZERO_SLOT);
+    assert.strictEqual(FIN.verify(src+"\n").ok,false,"tampered final bytes must fail identity");
   });
   t("B.4 两棵树 finalize 后指纹相同，且等于真 dist 的 guardBuildFingerprint", () => {
     const f0 = FIN.fingerprintOf(fs.readFileSync(results[0].distPath, "utf8"));

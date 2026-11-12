@@ -87,11 +87,10 @@ function prepareVisibleExecution(source, options = {}) {
     cwd: options.cwd,
     sourcePath: options.sourcePath,
     workspaceRoots: options.workspaceRoots || [],
-    stataRoot: options.stataRoot,
-    cnmRoot: options.cnmRoot,
-    documentsRoot: options.documentsRoot,
+    sourcePathMappings: options.sourcePathMappings,
     tempRoot: options.tempRoot,
   };
+  if (Array.isArray(options.sourcePathMappings) && options.sourcePathMappings.length) compatOptions.recursiveReferencedDo = true;
   if (platform === "darwin") {
     compatOptions.recursiveReferencedDo = true;
     compatOptions.transformReferencedCode = (code, context) => {
@@ -108,6 +107,11 @@ function prepareVisibleExecution(source, options = {}) {
   try {
     prepared = sourceCompat.prepareExecutionCode(original, compatOptions);
   } catch (error) {
+    if (error.code === "SOURCE_PATH_MAPPINGS_INVALID") throw error;
+    if (platform !== "darwin" && compatOptions.recursiveReferencedDo) {
+      error.code = "SOURCE_PATH_MAPPING_PREPARATION_FAILED";
+      throw error;
+    }
     if (platform !== "darwin") throw error;
     const reason = error && error.message ? error.message : String(error);
     return {

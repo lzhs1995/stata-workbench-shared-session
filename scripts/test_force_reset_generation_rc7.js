@@ -13,7 +13,16 @@ function windowFrom(marker, length) {
   return bundle.slice(at, at + length);
 }
 
-const reset = windowFrom("globalThis.__codexForceReset=async", 9000);
+// The whole force-reset function, from its unique start to its unique end
+// (no character window that could reach past the function or stop inside it).
+function between(start, end) {
+  const at = bundle.indexOf(start);
+  assert.ok(at >= 0 && bundle.indexOf(start, at + 1) < 0, `missing or ambiguous start: ${start}`);
+  const stop = bundle.indexOf(end, at);
+  assert.ok(stop > at && bundle.indexOf(end, stop + 1) < 0 && bundle.indexOf(end) === stop, `missing or ambiguous end: ${end}`);
+  return bundle.slice(at, stop + end.length);
+}
+const reset = between("globalThis.__codexForceReset=async", "let __state=__current();__state.cleanup=__cleanup;");
 assert.ok(reset.includes("__codexResetGeneration=Number(globalThis.__codexResetGeneration||0)+1"));
 assert.ok(reset.includes("codex patch rc.7.9: force-reset generation fences stale handlers"));
 assert.ok(reset.includes("__codexExecution.finishRun(s,"));
@@ -38,12 +47,13 @@ assert.ok(reset.includes("__reconnect.timeoutMs=__codexFrReconnectMs"),
 assert.ok(reset.indexOf("Promise.resolve(zg.connect())") < reset.indexOf("s.postRunBusy=false"),
   "force reset must reconnect before clearing postRunBusy");
 
-const clientDispose = windowFrom("async dispose(){let __transport=this._transport", 700);
-assert.ok(clientDispose.includes("codex patch rc.7.10.15: atomic MCP client disposal"));
-assert.ok(clientDispose.indexOf("this._clientPromise=null") < clientDispose.indexOf("await __transport.close()"),
-  "dispose must detach the old client before awaiting transport shutdown");
-assert.ok(clientDispose.indexOf("this._transport=null") < clientDispose.indexOf("await __transport.close()"),
-  "dispose must detach the old transport before awaiting transport shutdown");
+const clientDispose = between("async dispose(){", "async cancelAll(){");
+assert.ok(clientDispose.includes('require("../scripts/backend_shutdown_runtime").lifecycle(this).dispose()'));
+// The actual adapter's detach-before-await and replacement admission races are
+// executed by test_backend_shutdown_bundle and test_backend_recovery_admission.
+const lifecycle = fs.readFileSync(path.join(__dirname, "backend_shutdown_core.js"), "utf8");
+assert.ok(lifecycle.indexOf("detach(); // recoverable") < lifecycle.indexOf("const old = [...transports];", lifecycle.indexOf("function dispose()")));
+assert.ok(reset.includes("__shutdownResetCheck()"));
 
 const human = windowFrom("async function xHg", 50000);
 assert.ok(human.includes("let __codexHumanFileResetGeneration=Number(globalThis.__codexResetGeneration||0)"));

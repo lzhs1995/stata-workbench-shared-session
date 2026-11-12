@@ -10,48 +10,59 @@ function slash(value) {
   return value ? String(value).replace(/\\/g, "/").replace(/\/$/, "") : null;
 }
 
-function firstExistingRoot(options = {}) {
-  const candidates = [];
-  const add = (value) => {
-    if (!value) return;
-    const resolved = path.resolve(String(value));
-    if (!candidates.includes(resolved)) candidates.push(resolved);
-  };
-  add(options.stataRoot);
-  add(options.sourcePath && path.dirname(options.sourcePath));
-  add(options.cwd);
-  for (const root of options.workspaceRoots || []) {
-    add(root);
-    add(path.join(root, "示例工作区"));
-  }
-  for (const candidate of candidates) {
-    try {
-      if (fs.existsSync(path.join(candidate, "demo.do")) ||
-          fs.existsSync(path.join(candidate, "WORLD_STRICT_EXTREME_PRESSURE_TEST_PLAN.md"))) {
-        return candidate;
-      }
-    } catch {}
-  }
-  return candidates[0] || null;
+function mappingError(detail) {
+  return Object.assign(new Error("SOURCE_PATH_MAPPINGS_INVALID: " + detail), { code: "SOURCE_PATH_MAPPINGS_INVALID" });
 }
 
-function deriveRoots(options = {}) {
-  const stataRoot = firstExistingRoot(options);
-  let cnmRoot = options.cnmRoot ? path.resolve(String(options.cnmRoot)) : null;
-  if (!cnmRoot && stataRoot) {
-    const normalized = slash(stataRoot);
-    const marker = "/example-project/";
-    const index = normalized.indexOf(marker);
-    if (index >= 0) cnmRoot = normalized.slice(0, index + marker.length - 1);
+function normalizeMappingPath(value) {
+  if (typeof value !== "string" || /[\x00-\x1f"`$]/.test(value)) throw mappingError("from/to must be literal absolute paths without quotes, controls or macros");
+  let normalized = value.replace(/\\/g, "/");
+  const unc = normalized.startsWith("//");
+  normalized = (unc ? "//" : "") + (unc ? normalized.slice(2) : normalized).replace(/\/{2,}/g, "/");
+  if (!/^(?:[A-Za-z]:\/|\/)/.test(normalized) || normalized.split("/").some(part => part === "." || part === "..")) {
+    throw mappingError("from/to must be absolute paths without dot segments");
   }
-  const documentsRoot = options.documentsRoot
-    ? path.resolve(String(options.documentsRoot))
-    : (cnmRoot ? path.dirname(cnmRoot) : null);
-  return {
-    stataRoot: slash(stataRoot),
-    cnmRoot: slash(cnmRoot),
-    documentsRoot: slash(documentsRoot),
-  };
+  if (unc && !/^\/\/[^/]+\/[^/]+/.test(normalized)) throw mappingError("UNC paths need a server and share");
+  if (normalized !== "/" && !/^[A-Za-z]:\/$/.test(normalized)) normalized = normalized.replace(/\/$/, "");
+  return normalized;
+}
+
+function normalizeSourcePathMappings(value = []) {
+  if (!Array.isArray(value)) throw mappingError("expected an array of {from,to}");
+  const seen = new Set();
+  return value.map((entry, index) => {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry)) throw mappingError("each mapping needs from/to");
+    const from = normalizeMappingPath(entry.from), to = normalizeMappingPath(entry.to);
+    const windows = /^[A-Za-z]:\/|^\/\//.test(from);
+    const key = windows ? from.toLowerCase() : from;
+    if (seen.has(key)) throw mappingError("duplicate source prefix");
+    seen.add(key);
+    return { from, to, windows, index };
+  }).sort((a, b) => b.from.length - a.from.length || a.index - b.index);
+}
+
+function rewriteSourcePaths(source, mappings) {
+  if (!mappings.length) return { code: String(source), count: 0 };
+  let count = 0;
+  // Map complete literal path tokens, not substrings in other accounts, sibling
+  // directories or prose. Compound quotes keep their surrounding backtick/' .
+  const code = String(source).replace(/"[^"\r\n]*"|[^\s"',;()]+/g, token => {
+    const quoted = token.startsWith('"'), value = quoted ? token.slice(1, -1) : token;
+    const normalized = value.replace(/\\/g, "/");
+    for (const mapping of mappings) {
+      const current = mapping.windows ? normalized.toLowerCase() : normalized;
+      const from = mapping.windows ? mapping.from.toLowerCase() : mapping.from;
+      if (current !== from && !current.startsWith(from.endsWith("/") ? from : from + "/")) continue;
+      const suffix = normalized.slice(mapping.from.length).replace(/^\/+/, "");
+      const replaced = mapping.to + (suffix ? (mapping.to.endsWith("/") ? "" : "/") + suffix : "");
+      if (replaced !== value) count++;
+      // An unquoted input may map into a path containing spaces. Quote the
+      // replacement instead of silently splitting it into Stata arguments.
+      return quoted || /[\s,;()']/.test(replaced) ? '"' + replaced + '"' : replaced;
+    }
+    return token;
+  });
+  return { code, count };
 }
 
 function rewriteQuotedPathSeparators(source) {
@@ -112,7 +123,7 @@ function protectTransportLog(source) {
 function transformSource(source, options = {}) {
   const input = String(source == null ? "" : source);
   const platform = options.platform || process.platform;
-  const roots = deriveRoots(options);
+  const mappings = normalizeSourcePathMappings(options.sourcePathMappings);
   const diagnostics = {
     platform,
     applied: false,
@@ -121,25 +132,15 @@ function transformSource(source, options = {}) {
     separatorRewrites: 0,
     dynamicGraphNameProtections: 0,
     dynamicGraphNameMacro: null,
-    roots,
+    configuredPathMappings: mappings.length,
   };
-  let code = input;
+  const mapped = rewriteSourcePaths(input, mappings);
+  let code = mapped.code;
+  diagnostics.rootRewrites = mapped.count;
   if (platform === "darwin") {
     if (code.charCodeAt(0) === 0xfeff) {
       code = code.slice(1);
       diagnostics.bomStripped = true;
-    }
-    const patterns = [
-      [/(?:C:)[\\/]+Users[\\/]+example[\\/]+Desktop[\\/]+示例工作区/gi, roots.stataRoot],
-      [/(?:C:)[\\/]+Users[\\/]+example[\\/]+Desktop[\\/]+example-project/gi, roots.cnmRoot],
-      [/(?:C:)[\\/]+Users[\\/]+example[\\/]+Desktop/gi, roots.documentsRoot],
-    ];
-    for (const [pattern, replacement] of patterns) {
-      if (!replacement) continue;
-      code = code.replace(pattern, () => {
-        diagnostics.rootRewrites += 1;
-        return replacement;
-      });
     }
     const separated = rewriteQuotedPathSeparators(code);
     code = separated.code;
@@ -297,7 +298,8 @@ function prepareExecutionCode(source, options = {}) {
 }
 
 module.exports = {
-  deriveRoots,
+  normalizeSourcePathMappings,
+  rewriteSourcePaths,
   ensurePaginationOff,
   makeCompatCopy,
   prepareExecutionCode,

@@ -6,7 +6,12 @@ const path = require("path");
 
 const target = path.join(__dirname, "..", "dist", "extension.js");
 let text = fs.readFileSync(target, "utf8");
-
+// Ordinary-window layers deliberately replace legacy anchors. Peel their exact
+// recorded inverses before replaying legacy maintenance, then apply them last.
+for (const name of ["./apply_stata_source_path_mappings_patch", "./apply_backend_shutdown_patch", "./apply_window_session_patch"]) {
+  const layer = require(name);
+  if (text.includes(layer.MARKER)) text = layer.revertBundle(text, { finalize: false });
+}
 function replaceOnce(name, before, after) {
   const first = text.indexOf(before);
   const second = first < 0 ? -1 : text.indexOf(before, first + before.length);
@@ -3425,5 +3430,66 @@ text = require("./apply_backend_warmup_patch").patchBundle(text, { finalize: fal
 text = require("./apply_single_do_pagination_patch").patchBundle(text, { finalize: false });
 // rc.7.74: soft Stop never dispatches a refused checkpoint restore (FULL45 S40).
 text = require("./apply_softstop_incomplete_checkpoint_patch").patchBundle(text, { finalize: false });
+// F0 P3: a ready checkpoint whose dataset file is gone is recovery failure.
+text = require("./apply_softstop_snapshot_presence_patch").patchBundle(text, { finalize: false });
+// next 0.2.0-next.1: Next default bridge port 17601
+text = require("./apply_next_identity_patch").patchBundle(text, { finalize: false });
+// next 0.2.0-next.2: agent identity, Terminal origin header, session events
+text = require("./apply_next_agent_identity_patch").patchBundle(text, { finalize: false });
+// next 0.2.0-next.3: bridge bearer authentication
+text = require("./apply_next_bridge_auth_patch").patchBundle(text, { finalize: false });
+// next E: accepted diff gate for agent Stata-source edits
+text = require("./apply_edit_proposal_patch").patchBundle(text, { finalize: false });
+// next 0.2.0-next.4: multi-session registry and per-session temp
+text = require("./apply_next_multi_session_patch").patchBundle(text, { finalize: false });
+// next F0: checkpoint restore owns READY
+text = require("./apply_restore_readiness_patch").patchBundle(text, { finalize: false });
+text = require("./apply_next_bridge_busy_notice_patch").patchBundle(text, { finalize: false });
+text = require("./apply_f0b_stop_button_fallback_patch").patchBundle(text, { finalize: false });
+// next F2: a guard cancel or a post-dispatch transport timeout restores the
+// pre-run checkpoint and refuses the next submit until the smoke passes.
+text = require("./apply_guard_cancel_restore_patch").patchBundle(text, { finalize: false });
+// next F2b: Download builds its save-dialog Uri through the unwrapped binding.
+text = require("./apply_download_uri_binding_patch").patchBundle(text, { finalize: false });
+// F fix3: the snapshotless soft-stop quiescence probe owns its rc instead of
+// inheriting Stata's residual _rc from the Break.
+text = require("./apply_softstop_quiescence_rc_patch").patchBundle(text, { finalize: false });
+// F fix4: Stop and KILL feedback tell the truth (F-1 marker line, P10 fenced toast, F-5 skipped smoke).
+text = require("./apply_stop_feedback_truth_patch").patchBundle(text, { finalize: false });
+// F fix5: a guard cancel names its own stall (W-P10) and mcp-stata events stay with
+// their task after a run was cut off before it learned its id (W-P1b / W-P9m root cause).
+text = require("./apply_guard_attribution_patch").patchBundle(text, { finalize: false });
+// F fix6: Terminal input waits for Stata start-up (rc.7.72 warm-up) before its
+// pre-log budget, as agent runs already did (W-P1 entry gap).
+text = require("./apply_terminal_warmup_patch").patchBundle(text, { finalize: false });
+// W-P1 diagnostics: timing lines for the first Terminal command (log-only).
+text = require("./apply_wp1_timing_patch").patchBundle(text, { finalize: false });
+// V3-S M3: a Stop while the backend is still starting skips the quiescence probe (no dispatch yet).
+text = require("./apply_stop_during_backend_start_patch").patchBundle(text, { finalize: false });
+// V3-W: worker CPU time counts as watchdog progress for IDLE (V3-M M4 / F-mac P5).
+text = require("./apply_worker_cpu_progress_patch").patchBundle(text, { finalize: false });
+// PLAN-V3 stage 6: the warm cache follows the default worker (pid/created_at);
+// Terminal input restarts a worker that died while starting, once, without force reset.
+text = require("./apply_warm_worker_identity_patch").patchBundle(text, { finalize: false });
+text = require("./apply_agent_warmup_refusal_patch").patchBundle(text, { finalize: false });
+// V3 M5: a Stata error that ran to its r(n) line reports Stata's return code
+// (agent STATA_ERROR outcome, Terminal rc) instead of an unconfirmed failure.
+text = require("./apply_stata_error_outcome_patch").patchBundle(text, { finalize: false });
+// F v3: Windows KILL, /panic-kill and a busy force reset end only this window's
+// backend process tree instead of every mcp-stata process and Stata GUI.
+text = require("./apply_windows_kill_scope_patch").patchBundle(text, { finalize: false });
+// rc.7.87: the "Running <name> [Cancel]" progress toast of a person's Run File /
+// Run Selection covers the Terminal Stop button; its Cancel now goes through Terminal Stop.
+text = require("./apply_progress_cancel_stop_patch").patchBundle(text, { finalize: false });
+// V3-W2 D5: /status shows the watchdog's worker CPU counters (read only).
+text = require("./apply_watchdog_cpu_status_patch").patchBundle(text, { finalize: false });
+// V3-W2: a macOS/Linux force reset ends this session's orphaned Stata worker (exact identity only).
+text = require("./apply_orphan_worker_reap_patch").patchBundle(text, { finalize: false });
+// V3-KW: a successful Windows KILL resets (dispose + reconnect) before its recovery smoke.
+text = require("./apply_windows_kill_reset_patch").patchBundle(text, { finalize: false });
+text = require("./apply_window_session_patch").patchBundle(text, { finalize: false });
+text = require("./apply_backend_shutdown_patch").patchBundle(text, { finalize: false });
+text = require("./apply_stata_source_path_mappings_patch").patchBundle(text, { finalize: false });
+text = require("./finalize_bundle_identity").finalize(text).text;
 fs.writeFileSync(target, text, "utf8");
 console.log(baseAlreadyApplied ? "RC7_SHARED_EXECUTION_UPDATED" : "RC7_SHARED_EXECUTION_APPLIED", target);

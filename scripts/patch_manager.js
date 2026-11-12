@@ -3,7 +3,7 @@
  * Stata Workbench shared-session patch manager.
  *
  * This manager treats the current, verified extension.js as a full patch set:
- *   - visible HTTP bridge on 127.0.0.1:17485
+ *   - visible HTTP bridge on 127.0.0.1:17601 (Next development line)
  *   - mcp-stata pinned to 1.26.1 with no --refresh/@latest
  *   - get_variable_list output noise filtered
  *   - terminal variable provider disabled
@@ -38,8 +38,8 @@ const EXT_ROOT = path.join(os.homedir(), ".vscode", "extensions");
 const EXTENSION_ID_PREFIX = "tmonk.stata-workbench-";
 const MANIFEST = path.join(WORKSPACE, "stata_workbench_patch_manifest.json");
 const PATCHED_BASELINE = path.join(WORKSPACE, "dist", "extension.js");
-const BRIDGE_URL = { host: "127.0.0.1", port: 17485, path: "/status" };
-const GRAPH_STATUS_URL = { host: "127.0.0.1", port: 17485, path: "/graph-status" };
+const BRIDGE_URL = { host: "127.0.0.1", port: 17601, path: "/status" };
+const GRAPH_STATUS_URL = { host: "127.0.0.1", port: 17601, path: "/graph-status" };
 const CLI_ARGS = process.argv.slice(2);
 const TARGET_REPO = CLI_ARGS.includes("--target=repo") ||
   CLI_ARGS.some((arg, index) => arg === "--target" && CLI_ARGS[index + 1] === "repo");
@@ -91,9 +91,34 @@ const REQUIRED_MARKERS = [
     marker: "codex-rc7-shared-execution",
   },
   {
+    key: "editProposalDiffGate",
+    label: "agent Stata edits require accepted diff proposals",
+    marker: "next patch E1: agent .do edits require explicit diff acceptance",
+  },
+  {
     key: "visibleBridgeTransientPortRebind",
     label: "surviving extension host retries transient bridge-port ownership races",
     marker: "codex patch rc.7.10.31: bridge retries transient EADDRINUSE",
+  },
+  {
+    key: "explicitBridgeBusyNotice",
+    label: "explicit bridge busy port explains agent connectivity failure",
+    marker: "next patch F1: explicit bridge busy notice names agent connectivity",
+  },
+  {
+    key: "f0bStopButtonFallback",
+    label: "Terminal Stop falls back to the registered cancel command",
+    marker: "next F0b: Terminal Stop falls back to the registered cancel command",
+  },
+  {
+    key: "guardCancelRestoresCheckpoint",
+    label: "guard cancel of a dispatched payload restores the pre-run checkpoint",
+    marker: "next patch F2: guard cancel restores the pre-run checkpoint",
+  },
+  {
+    key: "downloadUnwrappedUriBinding",
+    label: "Download builds its save dialog Uri through the unwrapped vscode binding",
+    marker: "next patch F2b: Download uses the unwrapped vscode Uri binding",
   },
   {
     key: "sharedExecutionLifecycle",
@@ -117,8 +142,8 @@ const REQUIRED_MARKERS = [
   },
   {
     key: "boundedMcpLogNotifications",
-    label: "mcp-stata runtime writes full logs before timeout-bounded notifications",
-    marker: "codex patch rc.7.10.18: timeout-bounded MCP log notifications",
+    label: "ordinary windows prepare a patched private runtime before connection",
+    marker: 'globalThis.__codexWindowSession=require(rg.join(g.extensionUri.fsPath,"scripts","window_session_vscode.js")).install(g,iA,zg)',
   },
   {
     key: "softStopDatasetRollback",
@@ -1347,9 +1372,9 @@ const REQUIRED_MARKERS = [
     marker: 'registerCommand("stata-workbench.panicKill"',
   },
   {
-    key: "panicKillAllStataDefault",
-    label: "panic kill defaults to the full Stata execution chain",
-    marker: "Kill all Stata processes",
+    key: "panicKillThisWindowConfirm",
+    label: "panic kill confirms ending only this window's backend",
+    marker: "Kill this window's Stata",
   },
   {
     key: "panicKillTransportReset",
@@ -1446,9 +1471,90 @@ const REQUIRED_MARKERS = [
     label: "graph PDF download preserves artifact baseDir",
     marker: "baseDir: activeModalArtifact.baseDir",
   },
+  {
+    key: "softStopQuiescenceRc",
+    label: "snapshotless soft-stop quiescence probe owns its rc",
+    marker: "codex patch rc.7.76: soft-stop quiescence probe owns its rc",
+  },
+  {
+    key: "stopFeedbackTruth",
+    label: "Stop and KILL feedback match what they did",
+    marker: "codex patch rc.7.77: stop feedback tells the truth",
+  },
+  {
+    key: "guardAttribution",
+    label: "guard cancel names its own stall and events stay with their task",
+    marker: "codex patch rc.7.78: guard cancel names its own stall and events stay with their task",
+  },
+  {
+    key: "terminalWarmup",
+    label: "Terminal input waits for Stata start-up before its pre-log budget",
+    marker: "codex patch rc.7.79: Terminal input waits for Stata start-up before its pre-log budget",
+  },
+  {
+    key: "wp1Timing",
+    label: "W-P1 timing lines for the first Terminal command (diagnostic)",
+    marker: "codex patch rc.7.80: W-P1 timing lines for the first Terminal command (diagnostic)",
+  },
+  {
+    key: "stopDuringBackendStart",
+    label: "Stop during backend start-up skips the quiescence probe",
+    marker: "codex patch rc.7.83: Stop during backend start-up skips the quiescence probe",
+  },
+  {
+    key: "workerCpuProgress",
+    label: "worker CPU time counts as watchdog progress",
+    marker: "codex patch rc.7.84: worker CPU time counts as watchdog progress",
+  },
+  {
+    key: "warmWorkerIdentity",
+    label: "warm cache follows the default worker; Terminal restarts a worker that died while starting",
+    marker: "codex patch rc.7.81: warm cache follows the default worker; Terminal restarts a worker that died while starting",
+  },
+  {
+    key: "agentWarmupRefusal",
+    label: "warm-up refusals say whether a retry can help",
+    marker: "codex patch rc.7.86: warm-up refusals say whether a retry can help (nothing was dispatched)",
+  },
+  {
+    key: "windowsKillScope",
+    label: "Windows KILL ends only this session's backend process tree",
+    marker: "codex patch rc.7.82: Windows KILL ends only this session's backend process tree",
+  },
+  {
+    key: "stataErrorOutcome",
+    label: "confirmed Stata errors report their return code",
+    marker: "codex patch rc.7.85: confirmed Stata errors report their return code",
+  },
+  {
+    key: "progressCancelStop",
+    label: "the progress toast's Cancel stops this visible run like Terminal Stop",
+    marker: "codex patch rc.7.87: the progress toast's Cancel stops this visible run like Terminal Stop",
+  },
+  {
+    key: "watchdogCpuStatus",
+    label: "/status shows the watchdog's worker CPU counters",
+    marker: "codex patch rc.7.88: /status shows the watchdog's worker CPU counters",
+  },
+  {
+    key: "orphanWorkerReap",
+    label: "force reset delegates descendant cleanup to the verified lifecycle adapter",
+    marker: "shutdown adapter owns reset capture",
+  },
+  {
+    key: "windowsKillReset",
+    label: "a successful Windows KILL resets the backend before the recovery smoke",
+    marker: "codex patch rc.7.90: a successful Windows KILL resets the backend before the recovery smoke",
+  },
 ];
 
 const AUXILIARY_MARKERS = [
+  {
+    key: "stataErrorOutcomeCore",
+    label: "packaged Stata error outcome module confirms only bound, uncancelled r(n) errors",
+    relativePath: path.join("scripts", "stata_error_outcome_core.js"),
+    marker: "function classify",
+  },
   {
     key: "stopCheckpointCore",
     label: "packaged Stop checkpoint module preserves full shared Stata state",
@@ -1490,6 +1596,18 @@ const AUXILIARY_MARKERS = [
     label: "Windows force cleanup requires explicit owned PIDs",
     relativePath: path.join("scripts", "cleanup_mcp_stata_processes.ps1"),
     marker: "-Force requires -OwnedPidCsv",
+  },
+  {
+    key: "windowsKillScopeCore",
+    label: "packaged Windows KILL scope module picks only this host's backend tree",
+    relativePath: path.join("scripts", "windows_kill_scope_core.js"),
+    marker: "function selectSessionTree",
+  },
+  {
+    key: "windowsPanicScopedTargets",
+    label: "Windows panic script ends exact pid+creation-time targets",
+    relativePath: path.join("scripts", "panic_kill_stata_chain.ps1"),
+    marker: "-ScopedTargetCsv",
   },
   {
     key: "autocompleteEmptyVarsNoRefreshLoop",
@@ -1571,6 +1689,12 @@ const AUXILIARY_MARKERS = [
     marker: "Workbench pre-flight timeout follows MCP_STATA_PREFLIGHT_TIMEOUT",
   },
   {
+    key: "runtimePatchTaskDoneRc",
+    label: "packaged mcp-stata patch sends this run's Stata rc in task_done",
+    relativePath: path.join("scripts", "stata_task_done_rc_patch.js"),
+    marker: "Workbench task_done carries this run's Stata rc",
+  },
+  {
     key: "forceResetReconnectFollowsSetupBudget",
     label: "Windows force-reset reconnect bound follows the Stata setup budget",
     relativePath: path.join("scripts", "stop_checkpoint_core.js"),
@@ -1593,6 +1717,30 @@ const AUXILIARY_MARKERS = [
     label: "rc.7.74 soft Stop never dispatches a refused checkpoint restore",
     relativePath: path.join("dist", "extension.js"),
     marker: "codex patch rc.7.74: soft Stop never dispatches a refused checkpoint restore",
+  },
+  {
+    key: "nextDefaultBridgePort",
+    label: "ordinary windows publish their OS-assigned loopback port",
+    relativePath: path.join("dist", "extension.js"),
+    marker: "onBound:__state=>{__port=__state.port;",
+  },
+  {
+    key: "nextAgentIdentityEvents",
+    label: "next 0.2.0-next.2: agent identity, Terminal origin header, session events",
+    relativePath: path.join("dist", "extension.js"),
+    marker: "next patch 0.2.0-next.2: agent identity, Terminal origin header, session events",
+  },
+  {
+    key: "nextBridgeBearerAuth",
+    label: "next 0.2.0-next.3: bridge bearer authentication",
+    relativePath: path.join("dist", "extension.js"),
+    marker: "next patch 0.2.0-next.3: bridge bearer authentication",
+  },
+  {
+    key: "nextMultiSession",
+    label: "next 0.2.0-next.4: multi-session registry and per-session temp",
+    relativePath: path.join("dist", "extension.js"),
+    marker: "next patch 0.2.0-next.4: multi-session registry and per-session temp",
   },
   {
     key: "runtimePatchTargetsListenerLoop",
@@ -1765,14 +1913,14 @@ const AUXILIARY_MARKERS = [
   {
     key: "runtimePatchWiredBeforeConnect",
     label: "extension applies the Data Browser runtime patch before MCP connect",
-    relativePath: path.join("dist", "extension.js"),
-    marker: "codex patch rc.7: mcp-stata Data Browser listener-loop patch",
+    relativePath: path.join("scripts", "window_session_vscode.js"),
+    marker: "await manager.prepare(originalLoad({ hostOnly: true }))",
   },
   {
     key: "runtimePatchWiredToLiveUvx",
-    label: "extension patches the live uvx runtime before MCP connect",
-    relativePath: path.join("dist", "extension.js"),
-    marker: "codex patch rc.7.10.27: patch live uvx runtime",
+    label: "ordinary window runtime patch fails before configuration publication",
+    relativePath: path.join("scripts", "window_session_core.js"),
+    marker: 'if (!patched || !patched.ok) throw failure("RUNTIME_PATCH_FAILED"',
   },
   {
     key: "internalGraphProbesAreQuiet",
@@ -1863,6 +2011,7 @@ const FORBIDDEN_MARKERS = [
   { key: "noLabelRecoveryBypass", label: "no label/code-regex recovery bypass", marker: "let __codexAllowRecoverySmoke=" },
   { key: "noGraphClearBusyRelease", label: "graph-clear cannot release postRunBusy", marker: '__codexSetPostRunBusy&&globalThis.__codexSetPostRunBusy(false,"graph-clear-complete"' },
   { key: "noGraphClearReadyWrite", label: "graph-clear cannot mark readiness ready", marker: 'readinessReason:"graph-clear-complete"' },
+  { key: "noProductPanicStataGui", label: "the extension never asks the panic script for every Stata GUI", marker: '"-IncludeStataGui"' },
 ];
 
 function findExtension() {
@@ -2153,7 +2302,7 @@ async function cmdVerify() {
     return;
   }
   console.log("");
-  process.stdout.write("Bridge    : checking http://127.0.0.1:17485/status ... ");
+  process.stdout.write("Bridge    : checking http://127.0.0.1:17601/status ... ");
   const bridge = await checkBridgeOnline();
   if (bridge.online) {
     console.log("OK online");
@@ -2162,7 +2311,7 @@ async function cmdVerify() {
     console.log("OFFLINE");
     console.log(`Reason    : ${bridge.error || "unknown"}`);
   }
-  process.stdout.write("Graphs    : checking http://127.0.0.1:17485/graph-status ... ");
+  process.stdout.write("Graphs    : checking http://127.0.0.1:17601/graph-status ... ");
   const graphStatus = await checkGraphStatusOnline();
   if (graphStatus.online) {
     console.log("OK online");

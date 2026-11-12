@@ -9,13 +9,11 @@ const core = require("./stata_source_compat_core");
 
 const roots = {
   platform: "darwin",
-  stataRoot: path.resolve("/Users/test/Documents/example-project/tasks/07_Stata-workbench/示例工作区"),
-  cnmRoot: path.resolve("/Users/test/Documents/example-project"),
-  documentsRoot: path.resolve("/Users/test/Documents"),
+  sourcePathMappings: [{ from: "C:/Users/Example Analyst/Desktop/模型", to: "/Users/fixture/projects/模型" }],
 };
 
 const source = [
-  "\ufeffglobal workfolder \"C:/Users/example/Desktop/示例工作区\"",
+  "\ufeffglobal workfolder \"C:/Users/Example Analyst/Desktop/模型\"",
   "global data \"${workfolder}\\0_data_clo\\Prepare_data\"",
   "local regex \"^foo\\\\d+$\"",
 ].join("\n");
@@ -26,11 +24,11 @@ assert.strictEqual(result.diagnostics.rootRewrites, 1);
 assert.strictEqual(result.diagnostics.separatorRewrites, 2);
 assert.strictEqual(result.diagnostics.dynamicGraphNameProtections, 0);
 assert.strictEqual(result.diagnostics.dynamicGraphNameMacro, null);
-assert.ok(result.code.includes(`global workfolder "${roots.stataRoot.replace(/\\/g, "/")}"`));
+assert.ok(result.code.includes(`global workfolder "${roots.sourcePathMappings[0].to}"`));
 assert.ok(result.code.includes('global data "${workfolder}/0_data_clo/Prepare_data"'));
 assert.ok(result.code.includes('local regex "^foo\\\\d+$"'), "non-path strings stay byte-identical");
 
-const win = core.transformSource(source, { ...roots, platform: "win32" });
+const win = core.transformSource(source, { platform: "win32" });
 assert.strictEqual(win.code, source);
 assert.strictEqual(win.diagnostics.applied, false);
 
@@ -58,7 +56,7 @@ assert.strictEqual(
 
 const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "compat-core-test-"));
 const sourceDo = path.join(tempRoot, "fixture.do");
-fs.writeFileSync(sourceDo, 'global workfolder "C:/Users/example/Desktop/示例工作区"\n', "utf8");
+fs.writeFileSync(sourceDo, 'global workfolder "C:/Users/Example Analyst/Desktop/模型"\n', "utf8");
 const before = fs.readFileSync(sourceDo);
 const prepared = core.prepareExecutionCode(`do "${sourceDo}"`, {
   ...roots,
@@ -72,7 +70,7 @@ assert.ok(prepared.code.startsWith("set more off\n"),
 assert.notStrictEqual(prepared.code, `do "${sourceDo}"`);
 assert.deepStrictEqual(fs.readFileSync(sourceDo), before, "research source must not be modified");
 const copiedPath = prepared.diagnostics.referencedDoCopies[0].tempPath;
-assert.ok(fs.readFileSync(copiedPath, "utf8").includes(roots.stataRoot.replace(/\\/g, "/")));
+assert.ok(fs.readFileSync(copiedPath, "utf8").includes(roots.sourcePathMappings[0].to));
 assert.strictEqual(prepared.diagnostics.referencedDoCopies[0].sourceIntact, true);
 
 const nestedDo = path.join(tempRoot, "nested-graph.do");

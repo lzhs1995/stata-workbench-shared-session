@@ -51,11 +51,13 @@ function enqueueHarness(source) {
   vm.createContext(ctx);
   const proto = vm.runInContext("({" + method(source, "_enqueue") + "," + method(source, "_withTimeout") + "," + method(source, "_isCancellationError") + "})", ctx);
   const client = { connects: 0 };
-  return Object.assign(Object.create(proto), {
+  const h = Object.assign(Object.create(proto), {
     _pending: 0, _active: false, _activeCancellation: null, _queue: Promise.resolve(), _cancellationSourcesByRunId: new Map(),
     _statusEmitter: { emit() {} }, _log() {}, _formatRecentStderr: () => "", _normalizeResponse: r => r, _collectGraphArtifacts: async () => [],
     _ensureClient: () => { client.connects++; return delay(50).then(() => client); },
   });
+  require("./test_daily_bundle_helpers").attachLifecycle(h);
+  return h;
 }
 async function cancelDuringConnect(source) {
   const h = enqueueHarness(source);

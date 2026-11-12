@@ -4,7 +4,7 @@
  *
  * OLD (obsolete): sips string count == 0 in extension.js
  * NEW:
- *   1) win32 token count must equal expected baseline (default 36)
+ *   1) win32 token count must equal expected baseline (default 42; rc.7.82 adds the pre-dispose scoped kill and recovery-smoke gate guards, and three for the in-bundle cleanup gate that holds readiness when cleanup is not ok)
  *   2) extension.js must not embed /usr/bin/sips executable path
  *   3) PNG_COMPAT production path must be under process.platform === "darwin"
  *   4) scripts/mac helpers must exist for packaging (not executed on Windows)
@@ -17,7 +17,9 @@ const path = require("path");
 
 const root = path.join(__dirname, "..");
 const ext = path.join(root, "dist", "extension.js");
-const expectedWin32 = parseInt(process.env.WIN32_BASELINE || "36", 10);
+// rc.7.89 adds one: the orphan-worker capture is skipped on win32 (rc.7.82 ends the whole tree there).
+// Preserve the historical 42-token baseline; daily removed one old capture branch.
+const expectedWin32 = parseInt(process.env.WIN32_BASELINE || "42", 10);
 
 function fail(msg) {
   console.error("GATE_FAIL", msg);
@@ -28,8 +30,10 @@ if (!fs.existsSync(ext)) fail("missing dist/extension.js");
 const text = fs.readFileSync(ext, "utf8");
 
 const win32 = (text.match(/win32/g) || []).length;
-if (win32 !== expectedWin32) {
-  fail(`win32 count ${win32} != baseline ${expectedWin32}`);
+const historical = require("./test_daily_bundle_helpers").beforeDaily(text);
+const historicalWin32 = (historical.match(/win32/g) || []).length;
+if (historicalWin32 !== expectedWin32 || win32 !== expectedWin32-1) {
+  fail(`win32 final ${win32}, historical ${historicalWin32} != expected ${expectedWin32-1}/${expectedWin32}`);
 }
 
 if (text.includes("/usr/bin/sips")) {
@@ -82,21 +86,29 @@ if (!text.includes("force-reset cleared continuityLost") && !text.includes("forc
 
 const forceResetAt = text.indexOf("globalThis.__codexForceReset=async");
 if (forceResetAt < 0) fail("missing force-reset implementation");
-const forceResetWindow = text.slice(forceResetAt, forceResetAt + 9000);
+const forceResetWindow = require("./test_daily_bundle_helpers").between(text,"globalThis.__codexForceReset=async", ";/* codex patch v5: force reset state cleanup */");
 if (!forceResetWindow.includes('if(process.platform==="win32"&&__codexForceResetWasBusy')) {
   fail("panic PowerShell escalation is not guarded by win32");
 }
-if (!forceResetWindow.includes('if(process.platform==="win32"){let __script=')) {
-  fail("owned-PID PowerShell cleanup is not guarded by win32");
+// rc.7.82: Windows cleanup reuses the verified scoped-tree result; the bare-pid
+// cleanup_mcp_stata_processes.ps1 call is gone from force reset.
+if (!forceResetWindow.includes('if(process.platform==="win32"){/* codex patch rc.7.82: no bare-pid cleanup')) {
+  fail("Windows force-reset cleanup is not the win32-guarded scoped result");
+}
+if (!forceResetWindow.includes('if(process.platform==="win32"&&globalThis.__codexKillScopeGeneration!==__codexThisResetGeneration')) {
+  fail("Windows pre-dispose scoped kill is not guarded by win32");
 }
 if (!forceResetWindow.includes('else if(process.platform==="darwin")')) {
   fail("missing Darwin owned-PID cleanup branch");
 }
-if (!forceResetWindow.includes('"-OwnedPidCsv",__owned.join(",")')) {
-  fail("Windows cleanup does not receive extension-owned PIDs");
+if (forceResetWindow.includes("-OwnedPidCsv") || forceResetWindow.includes("cleanup_mcp_stata_processes")) {
+  fail("Windows force reset still calls the bare-pid cleanup");
 }
-if (!forceResetWindow.includes('__args.push("--pid",String(__pid))')) {
-  fail("Darwin cleanup does not receive extension-owned PIDs");
+if (!forceResetWindow.includes('mode:"verified-lifecycle"') || !forceResetWindow.includes("zg.__codexLifecycle().status()")) fail("Darwin cleanup does not consume verified lifecycle result");
+if (forceResetWindow.includes("--pid") || forceResetWindow.includes("cleanup.sh")) fail("retired Darwin bare-PID cleanup remains");
+const shutdown = fs.readFileSync(path.join(root,"scripts/backend_shutdown_process.js"),"utf8");
+for (const guard of ['platform === "win32"', "root.host.createdMs", "root.createdMs", "root.ppid", "session binding changed", "orphan.startCapture", "orphan.finishReap", "host process group unsafe to signal"]) {
+  if (!shutdown.includes(guard)) fail("missing lifecycle process guard: "+guard);
 }
 if (!text.includes("codex patch rc.6.4: Windows panic command enters recovery control plane")) {
   fail("Windows panic command does not enter recovery control plane");

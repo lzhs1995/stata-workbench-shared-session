@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "0.1.3-rc.7.45",
+  "version": "0.2.0",
   "files": {
     "scripts/wire_rc713b_remaining.js": {
       "sha256": "ebd9ff993b435ac55c5fe625fbf514938fe28b8f8d995c723044ae42898cbfaa",
@@ -11,28 +11,28 @@
       "bytes": 578
     },
     "scripts/stop_checkpoint_core.js": {
-      "sha256": "b55135813dbb27c6b12e39a8301c96ae6fb4150b60edde7bd6fd1707ac806677",
-      "bytes": 41109
+      "sha256": "7e939d7fc6084fd944aaf5872b6883921a0962a5355ba2b105a626d7b9865293",
+      "bytes": 43580
     },
     "scripts/static_windows_gate.js": {
-      "sha256": "4db114e7153ca576767ace7d591bf9acc52217ac7ac8c29974ed36e1a73172f4",
-      "bytes": 6167
+      "sha256": "42f9960b8d417bd4cb2d82d9007f729ee80aabe247dfc628697f5dfa4f0ee5c8",
+      "bytes": 7854
     },
     "scripts/stata_source_compat_core.js": {
-      "sha256": "7682ca890f407f473c88abdf339adaaa40bd90bd6b9dd48835294cf023d68803",
-      "bytes": 10973
+      "sha256": "5c652dcbf834d9207854ca2a7be2bf2defec7495f0cfd1d3cfa6ed04a3c6e76c",
+      "bytes": 12310
     },
     "scripts/prerun_stage_guard.js": {
       "sha256": "4c42596be0491740c146d22864fe2326d8fe10193484a877a3e37919c8e82705",
       "bytes": 17618
     },
     "scripts/patch_manager.js": {
-      "sha256": "6fe258cc1d942c17709bdd857a585a9e7be6875bb6453b38c77661da3ff078da",
-      "bytes": 92503
+      "sha256": "a1f84b6530947613f5c19fe78eb67322ebe7c60e3b64d34d2ffafc2afbe78a15",
+      "bytes": 98846
     },
     "scripts/mcp_stata_runtime_patch.js": {
-      "sha256": "64013014e8598af5c7f70a276cd80a2f5c21d218eaa6fba59f079096c8f75ac9",
-      "bytes": 76393
+      "sha256": "81a6985043039bad22f7be8f9b94dbf271cf0476f79bef64077ec43f61785c5f",
+      "bytes": 76896
     },
     "scripts/manual_run_policy.js": {
       "sha256": "feaf9b71dca260f3fc2b671cf936db7cb9e7bcb1649a822b66f427fe3675a6ff",
@@ -63,12 +63,12 @@
       "bytes": 5598
     },
     "scripts/execution_lifecycle_core.js": {
-      "sha256": "f42bcda3fe41e12c24f74d57516e1a870328e11f725e3129d1adbb0d3aef0c40",
-      "bytes": 15512
+      "sha256": "423a817614c85b030c48b623739b4d4216ec2f464bfd6560cbce1eff20b2f823",
+      "bytes": 15515
     },
     "scripts/execution_guard.js": {
-      "sha256": "39b392e29fdee33b24d795df03537fd3f3271c4fec8daee251b7ccc5e3acdb87",
-      "bytes": 35848
+      "sha256": "ac65639ef32c2b24d205536a415d2037a74296a0f295bfd65f579022e3442a75",
+      "bytes": 45347
     },
     "scripts/escalation_ladder_gate.js": {
       "sha256": "0b4487f1c80bee598666ed21d87f71132d44b5fc336c22b1dfee10fb30131adc",
@@ -83,8 +83,8 @@
       "bytes": 35993
     },
     "scripts/darwin_compat_adapter.js": {
-      "sha256": "ee758e4cafde4667285f2c31b6f7b602e1bbb3ef112658c868911146bce4db76",
-      "bytes": 5735
+      "sha256": "6273a064ee4b80199972072849c64c00ecf7b8b187b651469d7e3504c786828c",
+      "bytes": 6037
     },
     "scripts/control_plane_core.js": {
       "sha256": "319727d6340fd9faf708675a4b57a7c9e5fa23445a17a87702b9bf6321dee0e5",
@@ -99,8 +99,8 @@
       "bytes": 6709
     },
     "scripts/bridge_rebind_core.js": {
-      "sha256": "fb75ed8b078ef3440a38d002754732e3e9af98b225e9421fa01b078a0e40664f",
-      "bytes": 4193
+      "sha256": "10300805884cfde10b27e7710d82ddeee4779355601378523cfb82f3a9655219",
+      "bytes": 4447
     },
     "scripts/audit_candidate_readonly.js": {
       "sha256": "9e5ef61456501dcc61fbc3f8feb4d17a89441541006be39b23e938e8974570af",
@@ -111,8 +111,8 @@
       "bytes": 5178
     },
     "scripts/apply_rc7_shared_execution_patch.js": {
-      "sha256": "73ddb13b74bf31ccb639099d528fc022b6834dc58059ff45f6affea90ff7c994",
-      "bytes": 337498
+      "sha256": "04340c90b6c5b30361f5507b44f9771cb9457c32c392c03d6fae079373f725fb",
+      "bytes": 343034
     },
     "scripts/apply_rc64_routes_patch.js": {
       "sha256": "b01e1225f5844b632e24d616957fb9e565541345a10d6f4fbc640a4b034070b2",
@@ -139,8 +139,8 @@
       "bytes": 11107
     },
     "dist/extension.js": {
-      "sha256": "f02ae62736459e89f9bbefc2cfaa55d73edb6e9ef1af662e17d778157d2ceacd",
-      "bytes": 5613878
+      "sha256": "8b8a9996a84b40d232b3c9dadf03d8a133770b8ab68bbfec1d508c1a5d8af3f6",
+      "bytes": 5703098
     },
     "scripts/mac/png_compat_transform.js": {
       "sha256": "cdea12886a1d5bb5b4c2b3e38829de1c7e68ed70e7777e8d6e2eb02bb0ce3514",
@@ -323,32 +323,32 @@
       "bytes": 3383
     },
     "tools/verify_release.py": {
-      "sha256": "9d64ae994081472ba252ea7a614c2f84032cc306a70addd9e3e44bad216bfc91",
-      "bytes": 1839
+      "sha256": "1a7e8ecb77e87f3be2abe14009806e72f5d21457aa26bb8773ebebc1612fceba",
+      "bytes": 1827
     },
     "tools/windows_workbench.py": {
-      "sha256": "d962450e215e3e6140ef1f0d118e5e32da244f698a9adb9a40c38156f985e93d",
-      "bytes": 11938
+      "sha256": "70f03550cb0cef941295994ef71ab51af159bff214a3222cf485417b85d14aca",
+      "bytes": 15742
     },
     "tools/mac_workbench.py": {
       "sha256": "9eec67a12eee087574f2d53b4492f315004c055da506d0a8eac1906494474c7f",
       "bytes": 3225
     },
     "tools/shared_stata.py": {
-      "sha256": "8c40400724173ef2949e687ee166509f7b6bf523165b8b8bf130d14d1d6c4ed3",
-      "bytes": 14838
+      "sha256": "cb86ae0411230f5429b9cfeca16e5d6a1d7a412db45e5177cd9508f79fa5e95d",
+      "bytes": 27546
     },
     "tools/workbench_doctor.py": {
-      "sha256": "764c40df9b70f6f1bfa0f362d8517f4d63abac68e5f8c986b16f9e947c330eae",
+      "sha256": "547acffd98bcc6c6371c9a4c6767303760ed56832a646c5f959acc9ccc7e46fe",
       "bytes": 4729
     },
     "tools/verified_workbench.py": {
-      "sha256": "00c20b6d8386a8efa47ef66e87255854cbf11eba85dfd4b9b44ebc880930ea2d",
-      "bytes": 11660
+      "sha256": "64f70517808d24c6261f63b65b004b5d91ef27f4b9a9c81b05ab3bd9263e72fe",
+      "bytes": 25858
     },
     "tools/workbench_platform.py": {
-      "sha256": "1b436f1b5dc6401be22596de2bfeed42aeb90ea1b0d480e4847c873ee21ccd14",
-      "bytes": 8126
+      "sha256": "1e393f9070e53f475ba98a88e1ea3760e504f05919019f22da7c942d4af717f8",
+      "bytes": 8578
     },
     "tools/mac_permissions.py": {
       "sha256": "afcbe7773caad7209745e5149c9dd7b7a7cea3e9a51968f66d75c2aceeb673d4",
@@ -391,12 +391,144 @@
       "bytes": 5809
     },
     "scripts/apply_softstop_incomplete_checkpoint_patch.js": {
-      "sha256": "6a2d8722b68c1763d32d9dacf4c846b405e3f49daa6cddbc6b80060894e314df",
-      "bytes": 5490
+      "sha256": "2822c960878fe0ba0ebeb4542c6a71cc74c7f6d0721f968de4a072ff72d543ec",
+      "bytes": 5844
+    },
+    "scripts/apply_next_identity_patch.js": {
+      "sha256": "21430a204519b3964f260275ac7d627f150b8b8786cc408388dfd8ed54bff1ba",
+      "bytes": 2349
+    },
+    "scripts/next_session_core.js": {
+      "sha256": "150c23f114c16481531f7adc2d0ae7d95eb883dea7ea72fee5ac90bcf7b49150",
+      "bytes": 7570
+    },
+    "scripts/apply_next_agent_identity_patch.js": {
+      "sha256": "91bae249699e98c5de9cd4b88552c35c790c4c05bafa6cf27f03f65477899e88",
+      "bytes": 8745
+    },
+    "scripts/next_bridge_auth_core.js": {
+      "sha256": "16619e82aff9c19fdacc5a7334018bb3fd3beb2917772e2751fb1cfe86269579",
+      "bytes": 10867
+    },
+    "scripts/apply_next_bridge_auth_patch.js": {
+      "sha256": "5a4a5801740abaaf433d12766209efdaa2ca83af48909e8c631617576023ac08",
+      "bytes": 5988
+    },
+    "scripts/apply_edit_proposal_patch.js": {
+      "sha256": "bc26132b82020eae4f1a3a4e52214c7637ba919dfadc7accef20c56475c234e3",
+      "bytes": 4239
+    },
+    "scripts/edit_proposal_core.js": {
+      "sha256": "39d6d22217f8dc783e5996a6bdf1507c6e4f999b39aca875d30baa6cfe4f3a77",
+      "bytes": 9842
+    },
+    "scripts/apply_restore_readiness_patch.js": {
+      "sha256": "a5d42211ea04c39f38bd0f2306fddad03ceaae74afebbe9b47cbf74fa8cfa1b5",
+      "bytes": 7996
+    },
+    "scripts/restore_readiness_core.js": {
+      "sha256": "96d2303c80472d876e6708866c553a5023bfb622882968f1d2fb68a0fefd4721",
+      "bytes": 1546
+    },
+    "scripts/guard_cancel_restore_core.js": {
+      "sha256": "7efc929056497d016467231b82123e0ea902a8a018445fb409f4f24e58b3736a",
+      "bytes": 17013
+    },
+    "scripts/stata_timing_patch.js": {
+      "sha256": "8038fcd9cb91f5be6f20c2a451b343a3b99e1eafa5569365499a445c196b2a45",
+      "bytes": 13520
+    },
+    "scripts/worker_cpu_progress_core.js": {
+      "sha256": "f65a41f9dc3d5d22ddcc5e2217d620dc60cf95a531efa5fec2551419b7920fbd",
+      "bytes": 12314
+    },
+    "scripts/stata_error_outcome_core.js": {
+      "sha256": "67eb6f91ace75ea20063121ce20b6f36e5d93f6eb8fc0bb01833fed87d1bd687",
+      "bytes": 7107
+    },
+    "scripts/stata_task_done_rc_patch.js": {
+      "sha256": "b16f0ce965490d1cf8f2a7fb8452bbacca8c1685510a5846106488d195fab5d9",
+      "bytes": 4602
+    },
+    "scripts/orphan_worker_core.js": {
+      "sha256": "3b776e302d647876a24d51d4b7131edf148da4360c9e48fa77e05d73cb56e0fa",
+      "bytes": 25828
+    },
+    "scripts/apply_progress_cancel_stop_patch.js": {
+      "sha256": "31ef1ed0b15f2c80d1c702bef82432a30d3478f0f6213453c0fa788309935482",
+      "bytes": 7540
+    },
+    "scripts/test_progress_cancel_stop_patch.js": {
+      "sha256": "e3889e4ad8adf6dfd152860fe9746f562191ef4c4f029b5b4575e91c7c4f5816",
+      "bytes": 11740
+    },
+    "scripts/window_session_core.js": {
+      "sha256": "6eafde82ebe4e86b3ae90d10981f4982703d9a51c01f10c6af69427d0c5e204a",
+      "bytes": 14253
+    },
+    "scripts/window_session_vscode.js": {
+      "sha256": "11dd719d00d107e4a706d4bc6de76b02afae7fdbed8e229acb04584e9aba5662",
+      "bytes": 2975
+    },
+    "scripts/window_session_status.js": {
+      "sha256": "4ebc8c7b461210b111208cc0e7f9c479d82d068e309daa87647bbcbf2071379a",
+      "bytes": 1844
+    },
+    "scripts/window_session_admission.js": {
+      "sha256": "e5fdde562027f7e862fbe5716ec75fc2c7eaa6ccd6ae0257fe09e32017d488ef",
+      "bytes": 9055
+    },
+    "scripts/apply_window_session_patch.js": {
+      "sha256": "6e19f528607e1c6322b3b3c0f90c74800b6749ff42bbd6ef5ab9ec681a060457",
+      "bytes": 5425
+    },
+    "scripts/backend_shutdown_core.js": {
+      "sha256": "96edea353df0d6bf148565f15085253c563fd5f01825d0247cf08592c9a54fe4",
+      "bytes": 15199
+    },
+    "scripts/backend_shutdown_process.js": {
+      "sha256": "8c6cb0bdf7cc3cb1888f052e1af627e8e8fb96b7885d5a2a9f9a0b71be97cd5e",
+      "bytes": 10635
+    },
+    "scripts/backend_shutdown_runtime.js": {
+      "sha256": "815df7a19c7562f959807d998240fab035ad7ea8470449c726de0370156136a5",
+      "bytes": 1852
+    },
+    "scripts/apply_backend_shutdown_patch.js": {
+      "sha256": "9f38c040edf68b21444d0a8348473948c7edd6dfaa009e8f381db486d49820ec",
+      "bytes": 11043
+    },
+    "scripts/agent_edit_vscode.js": {
+      "sha256": "32c1bdf48b685949dc1c185dd4a3ddcafe64290e12fe2a0314b48855e1161e40",
+      "bytes": 7522
+    },
+    "scripts/apply_stata_source_path_mappings_patch.js": {
+      "sha256": "698612473a597a2e12ef245f8de89c4261319ed1ef3e4c74cd56f1b681124abd",
+      "bytes": 2929
+    },
+    "tools/workbench_agent.py": {
+      "sha256": "3020ca63631d756c190f5553f4842aa03e441110a59868170ff5ad40fa6a1fc8",
+      "bytes": 21851
+    },
+    "tools/workbench_setup.py": {
+      "sha256": "6e9cee5da17322ac70cd6f1437d72071f74ed7ce456c87fb35d9964c2d1f9698",
+      "bytes": 17615
+    },
+    "tools/stata_session.py": {
+      "sha256": "4eba30ad10bdc806a7068b8726f8780ee146bfc7e8b0114ff702c5dc670f509e",
+      "bytes": 56516
+    },
+    "scripts/window_slot_recovery.js": {
+      "sha256": "58f52ab794f0297d152199063942d78bc3f1410adfd969dd09319718e1295f88",
+      "bytes": 9165
+    },
+    "scripts/check_release.js": {
+      "sha256": "76f0a9731f067a5e590dd5f3288de427edc7170836741b806776efc72a5f7746",
+      "bytes": 2141
     }
   },
-  "acceptanceStatus": "PENDING_LICENSED_MAC_FULL_ACCEPTANCE",
+  "acceptanceStatus": "PENDING_DAILY_020_MAC_WINDOWS_REAL_AGENT",
   "baselineManifest": "release/history/runtime-manifest-0.1.3-rc.7.39.json",
   "baselineManifestSha256": "d037f9d1929addd60c73d56a2b4704dbb91783c3bc99cfe078f9783fac1fe2e3",
-  "scope": "Candidate identity with isolated worker, checkpoint, graph-name, completion-tail and explicit saved-graph preview repairs. Earlier private compatibility PNG/GPH evidence predates final concurrency and click-preview changes; full licensed/native acceptance remains pending."
+  "scope": "Integrated ordinary-window candidate. Existing Next6 evidence remains historical and does not certify this build."
 }

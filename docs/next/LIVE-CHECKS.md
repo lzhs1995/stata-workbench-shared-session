@@ -1,0 +1,35 @@
+# 需要实机才能证明的点（Next）
+
+本页只列离线测试证明不了、必须在装了 Stata 的 Mac 或 Windows 上跑的检查。由 codex-astra（Mac）
+和经 xdev 派的 Windows 任务完成。每条完成后在「结果」列写日期、平台、证据路径。
+全部用 Next 的隔离配置目录、合成 `.do`、17601–17620 端口；不碰 17485 和研究目录。
+
+> 2026-11-02 更新：下表「结果」列没有逐条回填。截至 `main` 579b0fe9 的实机结果（macOS 和 Windows）
+> 汇总在 [README 的 Platform test results](../../README.md#platform-test-results)
+> （中文见 [README.zh-CN.md 的平台实测结果](../../README.zh-CN.md#平台实测结果)）。
+
+| # | 来自 | 检查 | 怎么判通过 | 结果 |
+|---|---|---|---|---|
+| L1 | A6 第 15 条 | `code --user-data-dir <新目录> --extensions-dir <共用目录> --new-window` 在 macOS 和 Windows 上是否起独立进程 | 两个配置目录各开一个窗口后，按进程数窗口，每个进程恰好 1 个窗口 | |
+| L2 | A6 第 16 条 | 配置目录里只有 Next 一个 Stata 类扩展时 bridge 正常起在 17601 | `/status` 200，`bridgePort` 17601 | |
+| L3 | A1 | Next VSIX 装进隔离配置目录后，未设端口时 bridge 监听 17601、不监听 17485 | `lsof`/`Get-NetTCPConnection` 只见 17601 | |
+| L4 | B | `shared_stata.py --agent-name claude --code 'display 1'`：Terminal 这次运行的卡片上方出现 `claude · <runId>`，runId 与回执里的 `runId` 相同 | 截图 + 回执 | |
+| L5 | B | 人按 Run File、在 Terminal 输入命令：卡片上方是 `You · <runId>` | 截图 | |
+| L6 | B | agent 长命令运行中人按 Run File：弹出的提示写明 `claude is running Stata (<runId>)` 并提到 Stop；`/events` 里有一条 `run-refused`，`busyRunId` 是 agent 那次 | 截图 + `/events` JSON | |
+| L7 | B | 一次 agent 运行、一次人的运行、一次 soft Stop 之后，`events.jsonl` 每次运行恰好一条 `run-start` 和一条 `run-end`（Stop 那次另有至多一条 `run-end-update`），seq 连续；`--events 0` 与文件内容一致 | 文件 + 命令输出 | |
+| L8 | B | 把 `next_session_core.js` 暂时改名后重载窗口：扩展照常激活、能跑代码，`/status.nextSession.error` 有原因，`/events` 回 503；改回后恢复。装了 C（0.2.0-next.3）后 bridge 对所有请求回 503 `AUTH_UNAVAILABLE`、`detail` 写原因，人在编辑器和 Terminal 里照常能跑 | `/status` 或 503 JSON | |
+| L9 | C | 窗口起来后不带 token 调 `curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:<端口>/status` 得 401；带 `Origin: http://example.com` 得 403；`Host: localhost:<端口>` 得 403 | 三个状态码 | |
+| L10 | C | `shared_stata.py --code 'display 1'` 和 `--events 0` 不另给 token 就能用（从注册表取） | 命令输出 | |
+| L11 | C | `~/.stata-workbench-next/sessions/<sessionId>.json`：macOS `stat -f %Lp` 是 600；Windows `icacls` 只列当前用户一条、没有 `(I)`、没有 SYSTEM 和 Administrators；顺带记下窗口打开到 `/status` 能用的秒数（Windows 上写注册表要起一次 PowerShell） | `stat`/`icacls` 输出 + 秒数 | |
+| L12 | C | 关掉窗口后这个窗口的记录被删；另一个仍开着的窗口的记录还在 | 前后 `ls` | |
+| L13 | C | `/status.nextAuth` 有 `published:true` 和端口，`/status`、`events.jsonl` 里都搜不到 token 字符串 | `grep -c` 为 0 | |
+| L14 | K0 | 合成会话 `clear all` 后 `set obs 100000`，再交一条 `display 1`（agent）和一次 Run File（人）；再在 `set obs 1` 的会话里跑一个长命令并 soft Stop | 两次都 rc 0、无 `EXEC_REJECTED`；Stop 后 `display c(N), c(k)` 分别是 100000 0 和 1 0 | |
+| L15 | D | `stata_session.py open p1` 再 `open p2`：两个窗口各一个 VS Code 主进程；端口 17601、17602；`--list-sessions` 列两条，会话名分别是 p1、p2 | `list` 输出 + 进程数 | |
+| L16 | D | macOS `open -n -a … --env` 传进去的环境到了扩展宿主：`/status.nextMulti.sessionName` 是 p1、`mcpConfigPath` 是 `profiles/p1/mcp.json`；把 `--env` 去掉只靠 settings 也一样 | 两次 `/status` | |
+| L17 | D | 运行时隔离：p1 跑一次后 `~/.local/share/stata-workbench/mcp-stata-1.26.1/.../stata_client.py` 的 mtime 不变，`profiles/p1/runtime/.../stata_client.py` 被打补丁；mcp-stata 进程的命令行是 `profiles/p1/runtime/bin/python3` | `stat` + `ps` | |
+| L18 | D | 运行前快照落在 `runs/<sessionId>/tmp/codex_prerun_*.dta`，不在系统临时目录 | `ls` | |
+| L19 | D | p1、p2 真正重叠各跑一个 20 秒的模型：各自 global、`e()`、图、日志不串；Stop p1 不影响 p2 | 两份回执 + 两个 Terminal 截图 | |
+| L20 | D | 两个会话都活着时不带 `--session` 提交，得 `MULTIPLE_SESSIONS`、退出 2、回执 `postCount` 0 | 命令输出 | |
+| L21 | D | p1 force reset 后 `generation` 加 1；下一次 `shared_stata.py --session p1` 照常执行（注册表随 `/status` 刷新）；手改注册表里的 `generation` 后提交得 `SESSION_IDENTITY_MISMATCH`、`postCount` 0 | 两份回执 | |
+| L22 | D | 第 6 个 `open` 得 `SESSION_LIMIT`，不建目录、不起窗口；`close p3` 后可开 | 命令输出 | |
+| L23 | D | `close p1`：只有 p1 的窗口退出、p1 的记录被删、p2 照跑；有未保存文件时得 `CLOSE_PENDING`，窗口和文件都还在 | 前后 `list` + 截图 | |

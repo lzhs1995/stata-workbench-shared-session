@@ -81,6 +81,7 @@ async function runBlock(source, which, name) {
   let stopSnapshot = null;
   const ctx = vm.createContext({ console, Buffer, setTimeout, clearTimeout, Promise, Date, Math, JSON, Number, String, Object, Error, Array, Map, Set, RegExp, isFinite });
   Object.assign(ctx, {
+    __codexWindowTempDir: tmp,
     __codexResetGeneration: 2, __codexSupersedeHistory: [],
     __codexStopCheckpointRef: core, __codexPreRunGuardRef: guard,
     __codexPreRunSnapshots: new Map(), __codexActivePreRunSnapshot: null,

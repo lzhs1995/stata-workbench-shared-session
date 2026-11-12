@@ -18,9 +18,9 @@
  *
  * 收敛机制（为什么它能收敛而不是碰巧）：
  *   改写规则是**最终文本的性质**（"除声明点与包装器闭包外不得有裸 guard 引用"），
- *   不是历史的函数，所以路径无关且幂等。两条路径在 finalize 前唯一的差异是
- *   64 位指纹槽（基线=全 0；迁移=rc.7.13 的旧指纹 6fd716cb…），
- *   finalize_bundle_identity 归一化该槽后即逐字节相同。
+ *   不是历史的函数，所以路径无关且幂等。历史种子的 64 位指纹槽不同
+ *   （基线=全 0；迁移=rc.7.13 的旧指纹 6fd716cb…）。daily 重放链在末尾
+ *   finalize，三条腿的实际落盘字节必须已经相同；额外 finalize 必须幂等。
  */
 const assert = require("node:assert");
 const fs = require("node:fs");
@@ -76,6 +76,7 @@ function replayLeg(label, seedPath) {
     label, seedSha,
     preSha: sha256(Buffer.from(pre, "utf8")),
     preFingerprintSlot: FIN.locateSlot(pre).value,
+    replayIdentityValid: FIN.verify(pre).ok,
     finalSha: sha256(Buffer.from(text, "utf8")),
     fingerprint: FIN.fingerprintOf(text),
     bytes: Buffer.byteLength(text, "utf8"),
@@ -187,10 +188,13 @@ function main() {
       assert.strictEqual(m[4], "2", legs[idx].label + " 越界应恰 2 处（human-file enrich / 完成清理）");
     }
   });
-  t("A.6 finalize **前**指纹槽不同（这是两条路径唯一的差异来源）", () => {
-    assert.strictEqual(legs[0].preFingerprintSlot, FIN.ZERO_SLOT, "基线腿槽位应为 UNFINALIZED 全 0");
-    assert.strictEqual(legs[2].preFingerprintSlot, RC713_STALE_FINGERPRINT, "迁移腿槽位应仍是 rc.7.13 旧指纹");
-    assert.notStrictEqual(legs[0].preSha, legs[2].preSha, "finalize 前两者不该同 sha");
+  t("A.6 daily replay finalizes all distinct seed paths to the same valid bytes", () => {
+    for(const leg of legs){
+      assert.strictEqual(leg.replayIdentityValid,true,leg.label+" replay must finalize identity");
+      assert.strictEqual(leg.preSha,leg.finalSha,"extra finalize is byte-idempotent");
+      assert.strictEqual(leg.preFingerprintSlot,leg.fingerprint);
+    }
+    assert.strictEqual(legs[0].preSha,legs[2].preSha,"different historical seed paths converge before redundant finalize");
   });
 
   console.log("\n[B] 收敛：finalize 后六项指标必须完全一致");
@@ -246,11 +250,11 @@ function main() {
       assert.strictEqual(l.scope.checkpoint.bareViolations, 0, l.label + " 仍有裸消费点");
       assert.strictEqual(l.scope.checkpoint.outOfScope, 0, l.label + " 仍有越界消费点");
       assert.strictEqual(l.scope.checkpoint.exports, "__codexStopCheckpointRef:1");
-      assert.strictEqual(l.scope.checkpoint.globalRefs, 31,
-        l.label + " 全局引用数应为 31（新增 R16J114 失败恢复保全判断；含 rc.7.30 两条 payload tracking、两次 Stop"
+      assert.strictEqual(l.scope.checkpoint.globalRefs, 34,
+        l.label + " 全局引用数应为 34（新增 R16J114 失败恢复保全判断；含 rc.7.30 两条 payload tracking、两次 Stop"
         + " settlement probe，rc.7.35 阶梯的 4 处：hard-fallback 一处别名"
         + " __codexCkpt + force-reset 三处 forceResetReconnectTimeoutMs 探测，以及 rc.7.74 soft Stop"
-        + " 恢复判定的 3 处：restorePlan 探测与调用、restoreCode）");
+        + " 恢复判定的 3 处：restorePlan 探测与调用、restoreCode；P3 快照存在性判定 3 处）");
       assert.ok(/__codexStopCheckpoint:let/.test(l.scope.checkpoint.declKind),
         l.label + " 声明应为 let：" + l.scope.checkpoint.declKind);
     }
@@ -615,7 +619,7 @@ function main() {
     for (const [needle, why] of [
       ["__codexForceResetWasBusy=!!s.busy", "取证必须早于 reset 路径首次读写 busy"],
       ["__codexExecution.finishRun", "取证必须早于 finishRun"],
-      ["powershell.exe", "取证必须早于 Windows panic-kill 分支"],
+      ["__codexWindowsKillScopeRun", "取证必须早于 Windows panic-kill 分支"],  // rc.7.82: 作用域 kill helper
       ["s.runId=null", "取证必须早于 runId 清除"],
     ]) {
       assert.ok(capAt > 0 && src.indexOf(needle, capAt) > capAt, why);

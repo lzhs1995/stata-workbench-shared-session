@@ -37,8 +37,8 @@ if __name__ == "__main__":
     if args.packaged:
         if args.vsix:
             p.error("choose --vsix or --packaged")
-        version = json.loads((ROOT / "package.json").read_bytes())["version"]
-        args.vsix = ROOT / ("stata-workbench-shared-session-" + version + ".vsix")
+        package = json.loads((ROOT / "package.json").read_bytes())
+        args.vsix = ROOT / (package["name"] + "-" + package["version"] + ".vsix")
     result = verify(args.vsix)
     print(json.dumps(result))
     raise SystemExit(0 if result["verdict"] == "PASS" else 1)

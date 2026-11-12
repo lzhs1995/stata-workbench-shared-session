@@ -87,6 +87,7 @@ function clientHarness({ platform = "darwin", config, env = {}, force = false, p
     _transport: { async close() { instance.closeCount = (instance.closeCount || 0) + 1; } },
   };
   for (const name of ["_createClient", "_loadServerConfig", "_ensureLatestServerForMissingTool"]) instance[name] = vm.runInContext(`({${functions[name].source}}).${name}`, context);
+  require("./test_daily_bundle_helpers").attachLifecycle(instance);
   return { instance, calls, transports, logs, events, configPath };
 }
 function generatorHarness({ platform = "darwin", command = "uvx", version = "1.26.1", settings = {}, existing = "", explicit = false, probeFallback = false } = {}) {

@@ -5,6 +5,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import subprocess
 import sys
 import time
@@ -16,15 +17,15 @@ import urllib.request
 import urllib.error
 
 WORK = Path(__file__).resolve().parents[1]
-PROFILE = Path(os.environ.get("STATA_WORKBENCH_PROFILE", str(Path.home() / ".stata-workbench-shared"))).expanduser().resolve()
-EXTENSION = PROFILE / "extensions/lzhs1995.stata-workbench-shared-session-0.1.3-rc.7.45"
+PROFILE = Path(os.environ.get("STATA_WORKBENCH_PROFILE", str(Path.home() / ".stata-workbench-next" / "profiles" / "default"))).expanduser().resolve()
+EXTENSION = PROFILE / "extensions/lzhs1995.stata-workbench-shared-session-0.2.0"
 try:
-    PORT = int(os.environ.get("STATA_WORKBENCH_PORT", "17485"))
+    PORT = int(os.environ.get("STATA_WORKBENCH_PORT", "17601"))
 except ValueError:
     PORT = 0  # Doctor can report the bad setting before any connection or launch.
 CODE_CLI = host.default_code()
-VERSION = "0.1.3-rc.7.45"
-BUNDLE_SHA256 = "f02ae62736459e89f9bbefc2cfaa55d73edb6e9ef1af662e17d778157d2ceacd"
+VERSION = "0.2.0"
+BUNDLE_SHA256 = "8b8a9996a84b40d232b3c9dadf03d8a133770b8ab68bbfec1d508c1a5d8af3f6"
 PINS = {
     WORK / "dist/extension.js": BUNDLE_SHA256,
 }
@@ -45,6 +46,220 @@ def output(argv):
     return subprocess.check_output(argv, text=True, timeout=10).strip()
 
 
+STATE_ROOT = Path(os.environ.get("STATA_WORKBENCH_HOME", os.environ.get("STATA_WORKBENCH_NEXT_HOME", str(Path.home() / ".stata-workbench")))).expanduser()
+SESSION_SCHEMA = "stata-workbench-next-session/1"
+
+
+class SessionRegistryError(RuntimeError):
+    pass
+
+
+class MultipleSessionsError(SessionRegistryError):
+    pass
+
+
+class SessionIdentityError(RuntimeError):
+    pass
+
+
+# 本次调用绑定的会话（bind_session 设）。绑定后整次调用只认这个 sessionId，扩展重载换了会话就拒绝，不改投别的会话。
+BOUND_SESSION_ID = None
+
+
+class _WindowsProcessApi:
+    """pid_alive 用到的三个 kernel32 调用。测试换成假的，就能在任何平台上走 Windows 分支。"""
+
+    def __init__(self):
+        import ctypes
+        self._ctypes = ctypes
+        self._kernel = ctypes.WinDLL("kernel32", use_last_error=True)
+
+    def open_query(self, pid):
+        """(handle, 0) 或 (None, GetLastError())。"""
+        handle = self._kernel.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        return (handle, 0) if handle else (None, self._ctypes.get_last_error())
+
+    def exit_code(self, handle):
+        code = self._ctypes.c_ulong()
+        if not self._kernel.GetExitCodeProcess(handle, self._ctypes.byref(code)):
+            return None
+        return code.value
+
+    def close(self, handle):
+        self._kernel.CloseHandle(handle)
+
+    def live_pids(self):
+        """K32EnumProcesses 列出的 pid 集合；拿不到返回 None。不需要管理员权限。"""
+        ctypes = self._ctypes
+        size = 1024
+        while size <= 1 << 20:
+            buf = (ctypes.c_ulong * size)()
+            needed = ctypes.c_ulong()
+            if not self._kernel.K32EnumProcesses(buf, ctypes.sizeof(buf), ctypes.byref(needed)):
+                return None
+            count = needed.value // ctypes.sizeof(ctypes.c_ulong)
+            if count < size:
+                return set(buf[:count])
+            size *= 2
+        return None
+
+
+def _windows_pid_alive(pid, api):
+    if pid <= 0:
+        return None
+    handle, error = api.open_query(pid)
+    if not handle:
+        if error == 87:  # ERROR_INVALID_PARAMETER = no such pid
+            return False
+        if error == 5:
+            # ERROR_ACCESS_DENIED 有两种：活着但没权限查（如 System pid 4），或刚退出、内核对象
+            # 还被别的句柄引用着（实测 pid 9764）。已退出的进程不在系统的进程列表里，
+            # 所以只在列表拿得到且确实没有这个 pid 时才判死；在列表里或拿不到列表都算未知。
+            pids = api.live_pids()
+            if pids is not None and pid not in pids:
+                return False
+        return None
+    try:
+        code = api.exit_code(handle)
+        if code is None:
+            return None
+        return code == 259  # STILL_ACTIVE
+    finally:
+        api.close(handle)
+
+
+def pid_alive(pid):
+    """True 活着，False 确定已死，None 不知道（无权限、没有 pid）。未知一律当活，不跳过。"""
+    if type(pid) is not int or pid <= 0:
+        return None
+    if sys.platform == "win32":
+        return _windows_pid_alive(pid, _WindowsProcessApi())
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except OSError:
+        return None
+
+
+def registry_records(root=None, alive=None):
+    """注册表里格式正确的记录（含 token），附 alive 三态。读不出、格式不对的文件跳过。"""
+    alive = alive or pid_alive
+    directory = (root or STATE_ROOT) / "sessions"
+    try:
+        names = sorted(os.listdir(directory))
+    except OSError:
+        names = []
+    records = []
+    for name in names:
+        if not name.endswith(".json") or name.startswith("."):
+            continue
+        try:
+            rec = json.loads((directory / name).read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        if (isinstance(rec, dict) and rec.get("schema") == SESSION_SCHEMA and type(rec.get("port")) is int
+                and isinstance(rec.get("sessionId"), str)
+                and isinstance(rec.get("token"), str) and re.fullmatch(r"[A-Za-z0-9_-]{16,128}", rec["token"])):
+            records.append({**rec, "alive": alive(rec.get("extensionHostPid"))})
+    return records
+
+
+def select_session(selector=None, port=None, root=None, alive=None):
+    """选会话：selector 是会话名或 sessionId；没给就按 port 过滤。extensionHostPid 确定已死的跳过。
+    一条也没有报 SESSION_REGISTRY_MISSING；多于一条报 MULTIPLE_SESSIONS。两种都不执行代码。"""
+    directory = (root or STATE_ROOT) / "sessions"
+    live = [r for r in registry_records(root, alive) if r["alive"] is not False]
+    if selector:
+        found = [r for r in live if selector in (r.get("sessionId"), r.get("sessionName"))]
+        if port is not None:
+            found = [r for r in found if r["port"] == port]
+        what = f"session {selector!r}"
+    elif port is not None:
+        found = [r for r in live if r["port"] == port]
+        what = f"port {port}"
+    else:
+        found = live
+        what = "any live session"
+    if not found:
+        raise SessionRegistryError(f"SESSION_REGISTRY_MISSING: no live Next session record for {what} in {directory}; nothing was executed")
+    if len(found) > 1:
+        names = ", ".join(f"{r.get('sessionName') or '?'}={r['sessionId']}:{r['port']}" for r in found)
+        raise MultipleSessionsError(f"MULTIPLE_SESSIONS: {len(found)} live Next sessions match {what} ({names}); "
+                                    "pass --session <name or id>; nothing was executed")
+    return found[0]
+
+
+def session_record(port=None, root=None):
+    """当前请求要用的记录（含 token）。已绑定时只认绑定的 sessionId；每次请求都重新读，
+    扩展重载换了会话就报 SESSION_REGISTRY_MISSING，不改投别的会话。"""
+    if BOUND_SESSION_ID is not None:
+        rec = [r for r in registry_records(root) if r["sessionId"] == BOUND_SESSION_ID and r["alive"] is not False]
+        if len(rec) != 1:
+            raise SessionRegistryError(f"SESSION_REGISTRY_MISSING: bound session {BOUND_SESSION_ID} is no longer registered; nothing was executed")
+        return rec[0]
+    return select_session(None, PORT if port is None else port, root)
+
+
+def auth_headers(port=None, root=None):
+    rec = session_record(port, root)
+    return {"Authorization": "Bearer " + rec["token"], "Host": f"127.0.0.1:{rec['port']}"}
+
+
+def bind_session(selector=None, root=None, alive=None):
+    """在任何请求之前选定会话，并把 PORT/PROFILE/EXTENSION 指到它。selector 没给时用环境变量
+    STATA_WORKBENCH_SESSION；显式设了 STATA_WORKBENCH_PORT 就只在该端口里选。"""
+    global BOUND_SESSION_ID, PORT, PROFILE, EXTENSION
+    selector = selector or os.environ.get("STATA_WORKBENCH_SESSION") or None
+    port = PORT if "STATA_WORKBENCH_PORT" in os.environ else None
+    rec = select_session(selector, port, root, alive)
+    profile = rec.get("profilePath")
+    if rec.get("ordinaryWindow") is True:
+        extension = rec.get("extensionPath")
+        if not isinstance(extension, str) or not Path(extension).is_absolute() or not profile or not Path(profile).is_absolute():
+            raise SessionRegistryError("SESSION_INSTALLATION_MISSING: window has no absolute installation/runtime identity")
+        EXTENSION, PROFILE = Path(extension).resolve(), Path(profile).resolve()
+        PORT, BOUND_SESSION_ID = rec["port"], rec["sessionId"]
+        return rec
+    if profile:
+        profile = Path(profile).expanduser().resolve()
+        if "STATA_WORKBENCH_PROFILE" in os.environ and profile != PROFILE:
+            raise SessionRegistryError(f"SESSION_PROFILE_MISMATCH: session {rec['sessionId']} uses {profile}, "
+                                       f"STATA_WORKBENCH_PROFILE is {PROFILE}; nothing was executed")
+        EXTENSION = profile / EXTENSION.relative_to(PROFILE)
+        PROFILE = profile
+    PORT = rec["port"]
+    BOUND_SESSION_ID = rec["sessionId"]
+    return rec
+
+
+def verify_session_identity(status, root=None):
+    """提交前核对：注册表里绑定的会话与 /status 的 sessionId、port、generation、bundle SHA 一一相同。
+    任一缺失或不符就拒绝（不执行）。/status 经过鉴权门时扩展先刷新注册表，所以这里重读一次即可。"""
+    rec = session_record(None, root)
+    s = status if isinstance(status, dict) else {}
+    pairs = {
+        "sessionId": (rec.get("sessionId"), (s.get("nextSession") or {}).get("sessionId")),
+        "port": (rec.get("port"), (s.get("nextAuth") or {}).get("port")),
+        "generation": (rec.get("generation"), s.get("resetGeneration")),
+        "bundleSha": (rec.get("diskBundleSha256"), s.get("diskBundleSha256")),
+    }
+    bad = sorted(k for k, (a, b) in pairs.items() if a is None or b is None or a != b)
+    if bad:
+        raise SessionIdentityError("SESSION_IDENTITY_MISMATCH: registry and /status differ on " + ", ".join(bad)
+                                   + " " + json.dumps({k: pairs[k] for k in bad}) + "; nothing was executed")
+    return {k: a for k, (a, _) in pairs.items()}
+
+
+def list_sessions(root=None, alive=None):
+    """--list-sessions：注册表里的会话，不含 token。"""
+    keep = ("sessionId", "sessionName", "port", "alive", "extensionHostPid", "backendPid", "startedAt", "generation",
+            "profilePath", "workspacePath", "tempDir", "logDir", "graphDir", "checkpointDir", "dataDir", "eventsPath",
+            "diskBundleSha256", "ordinaryWindow", "extensionPath")
+    return [{k: r.get(k) for k in keep} for r in registry_records(root, alive)]
+
+
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         raise RuntimeError("bridge redirects are forbidden")
@@ -58,11 +273,17 @@ class LocalBridge:
         return self.request(path, payload, timeout)
 
     def request(self, path, payload=None, timeout=5):
-        if path not in ("/status", "/run-command"):
+        # Explicit verbs and bounded query shapes; never expose arbitrary controls.
+        read_allowed = payload is None and (path == "/status" or
+            re.fullmatch(r"/events\?since=\d{1,12}(&limit=\d{1,4})?", path) or
+            re.fullmatch(r"/(proposals|agent-runs)/[A-Za-z0-9_-]{1,80}", path))
+        write_allowed = isinstance(payload, dict) and path in (
+            "/run-command", "/propose-edit", "/document-state", "/agent-stop")
+        if not (read_allowed or write_allowed):
             raise ValueError("unsupported endpoint")
         req = urllib.request.Request(f"http://127.0.0.1:{PORT}{path}",
             data=json.dumps(payload).encode() if payload is not None else None,
-            headers={"Content-Type": "application/json"})
+            headers={"Content-Type": "application/json", **auth_headers()})
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
         try:
             with opener.open(req, timeout=timeout) as response:
@@ -76,6 +297,13 @@ class LocalBridge:
             raise RuntimeError("status unavailable")
         return body
 
+    def events(self, since=0, limit=None, timeout=5):
+        path = f"/events?since={int(since)}" + (f"&limit={int(limit)}" if limit else "")
+        rc, body = self.request(path, timeout=timeout)
+        if rc != 200 or not isinstance(body, dict) or not isinstance(body.get("events"), list):
+            raise RuntimeError("events unavailable")
+        return body
+
     def __getattr__(self, name):
         return getattr(self.platform, name)
 
@@ -85,6 +313,10 @@ def activate_once(pid):
 
 
 def observe(d):
+    if BOUND_SESSION_ID is not None:
+        rec = session_record()
+        if rec.get("ordinaryWindow") is True:
+            return observe_window_session(d, rec)
     instances = [row for row in d.w.code_instances() if row.get("launcher") is True]
     owner = d.w.bridge_owner()
     if len(instances) > 1:
@@ -105,6 +337,50 @@ def observe(d):
             "launcher": instances[0] if instances else None,
             "owner": owner, "identityOk": identity_ok,
             "axWindowCount": window["count"], "windowObservation": window,
+            "status": status}
+
+
+def listener_pids(port):
+    """Read only the exact loopback listener; never infer a target from Code root."""
+    if sys.platform == "darwin":
+        result = subprocess.run(["/usr/sbin/lsof", "-nP", "-a", "-iTCP:" + str(port), "-sTCP:LISTEN", "-Fp"],
+                                capture_output=True, text=True, timeout=10)
+        if result.returncode not in (0, 1):
+            raise RuntimeError("LISTENER_OBSERVATION_FAILED")
+        return {int(line[1:]) for line in result.stdout.splitlines() if re.fullmatch(r"p\d+", line)}
+    if sys.platform == "win32":
+        script = "$ErrorActionPreference='Stop'; @(Get-NetTCPConnection -State Listen -LocalPort " + str(int(port)) + ") | ForEach-Object { $_.OwningProcess }"
+        result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
+                                capture_output=True, text=True, timeout=15)
+        if result.returncode != 0:
+            raise RuntimeError("LISTENER_OBSERVATION_FAILED")
+        return {int(line.strip()) for line in result.stdout.splitlines() if line.strip().isdigit()}
+    raise RuntimeError("unsupported platform")
+
+
+def observe_window_session(d, rec, listeners=listener_pids):
+    """Authenticated per-window identity. No claim of physical focus or AX count."""
+    status = d.w.status(timeout=5)
+    verified = verify_session_identity(status)
+    pid = rec.get("extensionHostPid")
+    owns_listener = type(pid) is int and listeners(rec["port"]) == {pid}
+    identity_ok = (owns_listener and status.get("extensionHostPid") == pid
+        and status.get("extensionVersion") == VERSION
+        and status.get("diskBundleSha256") == BUNDLE_SHA256
+        and status.get("bundleIdentityState") == "OK"
+        and status.get("guardModuleIdentityState") == "OK"
+        and Path(status.get("bundleId") or "").resolve() == EXTENSION.resolve()
+        and (status.get("windowSession") or {}).get("sessionId") == rec["sessionId"])
+    terminal = status.get("terminalWebview") or {}
+    binding = {"verified": bool(identity_ok), "sessionId": verified["sessionId"],
+               "extensionHostPid": pid, "source": "authenticated-session-and-os-listener",
+               "terminalReady": terminal.get("panelExists") is True and terminal.get("scriptReady") is True}
+    return {"launcherPid": None, "launcher": None,
+            "owner": {"pid": pid, "sessionId": rec["sessionId"], "startedAt": rec.get("startedAt")},
+            "identityOk": bool(identity_ok), "windowBinding": binding,
+            "axWindowCount": None,
+            "windowObservation": {"ok": False, "count": None, "status": "NOT_MEASURED",
+                                  "note": "per-window binding verified separately; physical visibility/focus not asserted"},
             "status": status}
 
 
@@ -193,6 +469,9 @@ def main():
     mode.add_argument("--status", action="store_true")
     mode.add_argument("--doctor", action="store_true", help="non-prompting host/permission/window diagnosis")
     mode.add_argument("--request-permissions", action="store_true", help="one read-only System Events query; may show macOS consent")
+    mode.add_argument("--list-sessions", action="store_true", help="print the Next session registry (no tokens) and exit")
+    parser.add_argument("--session", default=None,
+                        help="session name or id to talk to (env STATA_WORKBENCH_SESSION); required when several are live")
     parser.add_argument("--no-activate", action="store_true")
     parser.add_argument("--remote-debugging-port", type=int, default=None,
                         help="with --open on a new launch only: 127.0.0.1 DevTools port for UI automation")
@@ -208,6 +487,11 @@ def main():
         result = diagnose(sys.modules[__name__])
         print(json.dumps(result, ensure_ascii=False))
         return 0 if result["verdict"] == "READY" else 2
+    if args.list_sessions:
+        print(json.dumps({"sessions": list_sessions()}, ensure_ascii=False))
+        return 0
+    if args.status:
+        bind_session(args.session)  # --open/--request-permissions 不需要已有会话
     d = helpers()
     if args.request_permissions:
         result = permissions.diagnostic(d, observe, request=args.request_permissions)
@@ -216,7 +500,8 @@ def main():
     if args.status:
         state = observe(d)
         print(json.dumps(state, ensure_ascii=False))
-        return 0 if state["identityOk"] and state["windowObservation"]["ok"] and state["axWindowCount"] == 1 else 2
+        return 0 if state["identityOk"] and ((state.get("windowBinding") or {}).get("verified") is True
+                    or state["windowObservation"]["ok"] and state["axWindowCount"] == 1) else 2
     with ExitStack() as stack:
         for lock in host.lock_paths(PROFILE, "open"):
             stack.enter_context(host.file_lock(lock))

@@ -90,8 +90,14 @@ function snapshotReadyRecord(snapshot) {
     const stat = fs.statSync(readyPath);
     if (!stat.isFile() || stat.size <= 0 || stat.size > 128) return null;
     const text = fs.readFileSync(readyPath, "utf8");
-    const match = /^ready\t([0-9a-f]{32})\t(data|empty)\r?\n?$/.exec(text);
+    // "obs" (no variables, N>0) carries its observation count; nothing else does.
+    const match = /^ready\t([0-9a-f]{32})\t(?:(data|empty)|obs\t([1-9][0-9]{0,14}))\r?\n?$/.exec(text);
     if (!match || match[1] !== nonce) return null;
+    if (match[3] !== undefined) {
+      const obs = Number(match[3]);
+      if (!Number.isSafeInteger(obs)) return null;
+      return { nonce: match[1], kind: "obs", obs, path: readyPath };
+    }
     return { nonce: match[1], kind: match[2], path: readyPath };
   } catch {
     return null;
@@ -224,10 +230,19 @@ function snapshotCode(snapshot, stataString) {
     'local __codex_snapshot_kind "data"',
     "capture noisily break {",
     "    frame copy `c(frame)' `__codex_snap_frame'",
-    "    if c(k) == 0 {",
+    // save needs one variable. k=0 N=0 gets one placeholder observation;
+    // k=0 N>0 keeps its N rows (set obs cannot shrink: r(198)) and records N
+    // so restore can rebuild exactly N observations and no variables.
+    // Two plain ifs instead of if/else: block replay has lost braces before.
+    "    if c(k) == 0 & c(N) == 0 {",
     "        frame `__codex_snap_frame': quietly set obs 1",
     "        frame `__codex_snap_frame': generate byte __codex_empty_state = .",
     '        local __codex_snapshot_kind "empty"',
+    "    }",
+    "    if c(k) == 0 & c(N) > 0 {",
+    '        local __codex_snapshot_obs = strtrim(string(c(N), "%20.0f"))',
+    "        frame `__codex_snap_frame': generate byte __codex_empty_state = .",
+    '        local __codex_snapshot_kind "obs"',
     "    }",
     `    frame \`__codex_snap_frame': quietly save "${q(snapshot.path)}", replace`,
     "}",
@@ -240,7 +255,9 @@ function snapshotCode(snapshot, stataString) {
     "if `__codex_snapshot_rc' == 0 & `__codex_snap_drop_rc' == 0 {",
     "    capture noisily {",
     `        file open \`__codex_sfh' using "${q(paths.snapshotReadyPath)}", write text replace`,
-    `        file write \`__codex_sfh' "ready" _tab "${nonce}" _tab "\`__codex_snapshot_kind'" _n`,
+    `        file write \`__codex_sfh' "ready" _tab "${nonce}" _tab "\`__codex_snapshot_kind'"`,
+    `        if "\`__codex_snapshot_kind'" == "obs" file write \`__codex_sfh' _tab "\`__codex_snapshot_obs'"`,
+    "        file write `__codex_sfh' _n",
     "        file close `__codex_sfh'",
     "    }",
     "    local __codex_snap_ready_rc = _rc",
@@ -563,9 +580,12 @@ function restoreCode(snapshot, stataString, options = {}) {
       return REFUSED_RESTORE_CODE;
     }
   }
-  const lines = [...globalLines.preflight, ready.kind === "empty"
-    ? "clear"
-    : `use "${q(snapshot.path)}", clear`];
+  const lines = [...globalLines.preflight, ready.kind === "data"
+    ? `use "${q(snapshot.path)}", clear`
+    : "clear"];
+  // No variables but N observations: the saved file only holds a placeholder
+  // column, so rebuild the exact N instead of loading it.
+  if (ready.kind === "obs") lines.push(`set obs ${ready.obs}`);
   // R16J116: a drained cancellation in native graphics left a broken axis/view
   // class cache (Super invalid member variable identifier). Dropping graph names
   // cannot reset that cache. Stata's supported discard resets it, but also clears
@@ -699,6 +719,35 @@ function isRestoreCapable(snapshot) {
     return stat.isFile() && stat.size >= 512;
   } catch {
     return false;
+  }
+}
+
+// Distinguish an absent pre-run snapshot from a registered checkpoint whose
+// dataset file disappeared (or became unreadable) before Stop.  The latter is
+// a continuity loss: reporting it as "no snapshot" would let the next request
+// run on post-run data while claiming the session is ready.
+function classifyRestoreSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot.path !== "string" || !snapshot.path) {
+    return { kind: "none", ok: true, skipped: "no pre-run dataset snapshot" };
+  }
+  let readyRecord = null;
+  try { readyRecord = snapshotReadyRecord(snapshot); } catch { readyRecord = null; }
+  try {
+    const stat = fs.statSync(snapshot.path);
+    if (!stat.isFile() || stat.size < 512) throw new Error("dataset snapshot is not a readable file");
+    fs.accessSync(snapshot.path, fs.constants.R_OK);
+    return { kind: "present", ok: true, readyRecord };
+  } catch (error) {
+    if (readyRecord) {
+      return {
+        kind: "missing",
+        ok: false,
+        readyRecord,
+        error: "pre-run dataset snapshot missing or unreadable",
+        detail: error?.message || String(error),
+      };
+    }
+    return { kind: "none", ok: true, skipped: "no ready pre-run dataset snapshot" };
   }
 }
 
@@ -967,6 +1016,7 @@ module.exports = {
   setupBudgetMs,
   initializeCheckpoint,
   isRestoreCapable,
+  classifyRestoreSnapshot,
   isSnapshotReady,
   reconnectTimeoutMs,
   restoreDowngradeSummary,

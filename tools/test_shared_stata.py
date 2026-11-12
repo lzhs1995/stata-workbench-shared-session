@@ -21,6 +21,12 @@ def state(rid="old"):
 
 
 class SharedClientTests(unittest.TestCase):
+    def setUp(self):
+        # 阶段 D 的注册表/状态一致性核对另有 test_next_multi_session_client 覆盖；这里测的是之后的派发协议
+        identity = patch.object(client.entry, "verify_session_identity", return_value={"sessionId": "s"})
+        identity.start()
+        self.addCleanup(identity.stop)
+
     def test_file_dispatch_freezes_original_bytes_before_post(self):
         with tempfile.TemporaryDirectory(prefix="shared 中文 ") as directory:
             root = Path(directory)
@@ -54,6 +60,136 @@ class SharedClientTests(unittest.TestCase):
             client.wait_ready(d, 0, observe=lambda _: busy, clock=lambda: 1, sleep=sleep)
         with self.assertRaisesRegex(RuntimeError, "identity"):
             client.wait_ready(d, 10, observe=lambda _: dict(busy, identityOk=False), clock=lambda: 0, sleep=sleep)
+
+    def _stata_error_run(self, directory, mutate_body=None, mutate_after=None, log_text=None):
+        """rc.7.85：扩展回 outcome=STATA_ERROR；日志用 Mac 实测的真实 per-run log（regress nosuchvar_v3a）。"""
+        fixture = Path(__file__).resolve().parents[1] / "scripts" / "fixtures" / "stata-error-logs" / "agent-regress-r111.txt"
+        log = Path(directory) / "mcp_stata_real.log"
+        log.write_text(log_text if log_text is not None else fixture.read_text(encoding="utf-8"), encoding="utf-8")
+        body = {"ok": False, "outcome": "STATA_ERROR", "executed": True, "stataRc": 111, "payloadMayHaveRun": True,
+                "error": "no variables defined", "runId": "new", "requestId": "req-new", "logPath": str(log),
+                "lifecycle": {"requestId": "req-new", "runId": "new", "sourceMode": "agent", "phase": "failed", "rc": 111,
+                              "logPath": str(log)}}
+        after = state("new")
+        after["status"]["lastCompletedRun"].update(rc=111, phase="failed", completionMarkerVerified=False, logPath=str(log))
+        if mutate_body:
+            mutate_body(body)
+        if mutate_after:
+            mutate_after(after)
+        post = Mock(return_value=(500, body))
+        result = client.execute_once(SimpleNamespace(w=SimpleNamespace(http_post=post)), {"code": "regress nosuchvar_v3a"},
+                                     Path(directory) / "receipt", observe=Mock(side_effect=[state(), after]))
+        self.assertEqual((result["postCount"], post.call_count), (1, 1))
+        return result
+
+    def test_confirmed_stata_error_is_its_own_verdict_and_never_retried(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = self._stata_error_run(directory)
+            self.assertEqual(result["verdict"], "STATA_ERROR_CONFIRMED", result.get("stataErrorChecks"))
+            self.assertEqual(result["stataRc"], 111)
+            self.assertTrue((Path(directory) / "receipt" / "run.log").is_file())
+
+    def test_stata_error_outcome_that_does_not_check_out_stays_unconfirmed(self):
+        cases = {
+            "completed rc differs": dict(mutate_after=lambda a: a["status"]["lastCompletedRun"].update(rc=198)),
+            "another request": dict(mutate_after=lambda a: a["status"]["lastCompletedRun"].update(requestId="req-other")),
+            "log rc differs": dict(mutate_body=lambda b: b.update(stataRc=198),
+                                   mutate_after=lambda a: a["status"]["lastCompletedRun"].update(rc=198)),
+            "no r(n) line": dict(log_text=". regress nosuchvar_v3a\n{err}no variables defined\n"),
+            "missing log": dict(mutate_body=lambda b: b.update(logPath="/nonexistent/mcp_stata_x.log")),
+            "payload may have run dropped": dict(mutate_body=lambda b: b.update(payloadMayHaveRun=False)),
+            "completed logPath differs": dict(mutate_after=lambda a: a["status"]["lastCompletedRun"].update(logPath="/tmp/mcp_stata_old.log")),
+            "lifecycle logPath missing": dict(mutate_body=lambda b: b["lifecycle"].pop("logPath")),
+        }
+        for name, kwargs in cases.items():
+            with self.subTest(name), tempfile.TemporaryDirectory() as directory:
+                result = self._stata_error_run(directory, **kwargs)
+                self.assertEqual(result["verdict"], "EXECUTION_UNCONFIRMED_NO_RETRY", name)
+                self.assertNotIn("stataRc", result)
+
+    def test_stata_error_with_printed_client_marker_stays_unconfirmed(self):
+        with tempfile.TemporaryDirectory() as directory, patch.object(client.uuid, "uuid4") as uid:
+            uid.return_value = SimpleNamespace(hex="feedface")
+            fixture = Path(__file__).resolve().parents[1] / "scripts" / "fixtures" / "stata-error-logs" / "agent-regress-r111.txt"
+            text = fixture.read_text(encoding="utf-8") + "{res}{txt}___VERIFIED_CLIENT_feedface___\n"
+            result = self._stata_error_run(directory, log_text=text)
+            self.assertEqual(result["verdict"], "EXECUTION_UNCONFIRMED_NO_RETRY")
+            self.assertFalse(result["stataErrorChecks"]["clientMarkerNotPrinted"])
+
+    def _stopped_run(self, directory, mutate_body=None, mutate_after=None):
+        """rc.7.87：扩展回 500 + stoppedBy（Mac 实测形状：Request cancelled、lastCompletedRun failed、soft-stop 恢复成功）。"""
+        before = state()
+        before["status"]["resetGeneration"] = 0
+        body = {"ok": False, "error": "Request cancelled", "runId": "req-new",
+                "stoppedBy": {"by": "person", "reason": "terminal Stop button", "runId": "new", "generation": 1, "at": "t"}}
+        after = state("new")
+        after["status"].update(resetGeneration=1, resetGenerationKind="soft-stop",
+                               lastSoftStop={"runId": "new", "generation": 1, "ok": True, "restored": True})
+        after["status"]["lastCompletedRun"].update(phase="failed", completionMarkerVerified=False)
+        if mutate_body:
+            mutate_body(body)
+        if mutate_after:
+            mutate_after(after)
+        post = Mock(return_value=(500, body))
+        result = client.execute_once(SimpleNamespace(w=SimpleNamespace(http_post=post)), {"code": "display 1"},
+                                     Path(directory) / "receipt", sleep=Mock(), observe=Mock(side_effect=[before, after]))
+        self.assertEqual((result["postCount"], post.call_count), (1, 1))
+        return result
+
+    def test_stop_with_bound_record_is_its_own_verdict_and_never_retried(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = self._stopped_run(directory)
+            self.assertEqual(result["verdict"], "STOPPED_NO_RETRY", result.get("stopChecks"))
+            self.assertEqual(result["stoppedBy"], "person")
+            self.assertEqual(result["stopReportedBy"], "person")
+            self.assertIn("restored the pre-run snapshot", result["note"])
+
+    def test_api_or_watchdog_stop_keeps_its_source_but_stays_unconfirmed(self):
+        # rc.7.87 复审 R1：只有人在 VS Code 里的 Stop 才判 STOPPED_NO_RETRY；api/watchdog 照旧 UNCONFIRMED，来源另记
+        for who, reason in (("api", "http /soft-stop"), ("watchdog", "guard cancel: PROGRESS stall")):
+            with self.subTest(who), tempfile.TemporaryDirectory() as directory:
+                result = self._stopped_run(directory, mutate_body=lambda b: b["stoppedBy"].update(by=who, reason=reason))
+                self.assertEqual(result["verdict"], "EXECUTION_UNCONFIRMED_NO_RETRY", who)
+                self.assertNotIn("stoppedBy", result)
+                self.assertEqual(result["stopReportedBy"], who)
+                self.assertFalse(result["stopChecks"]["stopByPerson"])
+                self.assertEqual([k for k, v in result["stopChecks"].items() if v is not True], ["stopByPerson"])
+
+    def test_stop_without_a_real_restore_of_this_stop_stays_unconfirmed(self):
+        # rc.7.87 复审 N1：ok=True 也可能是「没有快照、跳过恢复」；还要 restored 为真且是同一次 Stop 的 generation
+        cases = {
+            "no pre-run snapshot (ok, not restored)": lambda a: a["status"]["lastSoftStop"].update(restored=False, skipped="no pre-run dataset snapshot"),
+            "restored missing": lambda a: a["status"]["lastSoftStop"].pop("restored"),
+            "restore record of an older Stop": lambda a: a["status"]["lastSoftStop"].update(generation=0),
+            "restore record without generation": lambda a: a["status"]["lastSoftStop"].pop("generation"),
+        }
+        for name, mutate in cases.items():
+            with self.subTest(name), tempfile.TemporaryDirectory() as directory:
+                result = self._stopped_run(directory, mutate_after=mutate)
+                self.assertEqual(result["verdict"], "EXECUTION_UNCONFIRMED_NO_RETRY", name)
+                self.assertNotIn("stoppedBy", result)
+                self.assertEqual([k for k, v in result["stopChecks"].items() if v is not True], ["restoredAfter"], name)
+
+    def test_stop_record_that_does_not_check_out_stays_unconfirmed(self):
+        cases = {
+            "no stoppedBy": dict(mutate_body=lambda b: b.pop("stoppedBy")),
+            "stop of another run": dict(mutate_body=lambda b: b["stoppedBy"].update(runId="other")),
+            "unknown stopper": dict(mutate_body=lambda b: b["stoppedBy"].update(by="other")),
+            "stop before this submit": dict(mutate_body=lambda b: b["stoppedBy"].update(generation=0)),
+            "a later reset happened": dict(mutate_after=lambda a: a["status"].update(resetGeneration=2)),
+            "not a soft-stop reset": dict(mutate_after=lambda a: a["status"].update(resetGenerationKind="force-reset")),
+            "restore failed": dict(mutate_after=lambda a: a["status"]["lastSoftStop"].update(ok=False)),
+            "restore of another run": dict(mutate_after=lambda a: a["status"]["lastSoftStop"].update(runId="other")),
+            "another request": dict(mutate_after=lambda a: a["status"]["lastCompletedRun"].update(requestId="req-other")),
+            "run not failed": dict(mutate_after=lambda a: a["status"]["lastCompletedRun"].update(phase="completed")),
+            "not ready after": dict(mutate_after=lambda a: a["status"].update(trueReady=False)),
+            "also a Stata error": dict(mutate_body=lambda b: b.update(outcome="STATA_ERROR")),
+        }
+        for name, kwargs in cases.items():
+            with self.subTest(name), tempfile.TemporaryDirectory() as directory:
+                result = self._stopped_run(directory, **kwargs)
+                self.assertEqual(result["verdict"], "EXECUTION_UNCONFIRMED_NO_RETRY", name)
+                self.assertNotIn("stoppedBy", result)
 
     def test_failed_http_envelope_retains_run_identity_without_accepting_or_retrying(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -305,6 +441,64 @@ class SharedClientTests(unittest.TestCase):
             self.assertEqual(post.call_count, 1)
             self.assertEqual(timed["verdict"], "EXECUTION_UNCONFIRMED_NO_RETRY")
             self.assertEqual(json.loads((root / "timeout/result.json").read_bytes())["retryCount"], 0)
+
+    # M2：刚开窗、后端懒启动还没起（pids 空、backendStart 未连接），其余全绿时提交一次，扩展负责等
+    def cold(self):
+        s = state()
+        s["status"]["ownedBackendPids"] = []
+        s["status"]["backendStart"] = {"connected": False, "current": None, "lastCold": None}
+        return s
+
+    def test_cold_backend_submits_once_and_binds_the_cold_start(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            post = Mock(side_effect=TimeoutError("unknown execution outcome"))
+            d = SimpleNamespace(w=SimpleNamespace(http_post=post))
+            result = client.execute_once(d, {"code": "display 1"}, root / "cold", observe=lambda _: self.cold())
+            self.assertEqual(result["postCount"], 1)
+            self.assertTrue(result["coldBackend"])
+            self.assertEqual(result["verdict"], "EXECUTION_UNCONFIRMED_NO_RETRY")
+            for name, change in (("connected", {"connected": True}), ("busy", None)):
+                blocked_state = self.cold()
+                if change:
+                    blocked_state["status"]["backendStart"].update(change)
+                else:
+                    blocked_state["status"]["busy"] = True
+                blocked = client.execute_once(d, {"code": "display 1"}, root / name, observe=lambda _, s=blocked_state: s)
+                self.assertEqual(blocked["postCount"], 0, name)
+            self.assertEqual(post.call_count, 1)
+        after = state("new")
+        after["status"]["backendStart"] = {"connected": True, "lastCold": {"runId": "new", "outcome": "CONNECTED"}}
+        body = {"ok": True, "runId": "new", "rc": 0}
+        self.assertTrue(client.completion_checks({"coldBackend": True}, 200, body, self.cold(), after)["sameStataBackend"])
+        self.assertFalse(client.completion_checks({}, 200, body, self.cold(), after)["sameStataBackend"])
+        after["status"]["backendStart"]["lastCold"]["runId"] = "someone-else"
+        self.assertFalse(client.completion_checks({"coldBackend": True}, 200, body, self.cold(), after)["sameStataBackend"])
+
+    def test_warmup_refusal_is_reported_not_retried(self):
+        envelope = {"ok": False, "status": 504, "reasonCode": "PRE_RUN_BACKEND_WARMUP_TIMEOUT", "preRunStage": "backend-warmup",
+                    "payloadDispatched": False, "retryable": True, "retryAfterMs": 5000, "lastStatus": "starting"}
+        for body in (envelope, {"_httperror": json.dumps(envelope)}):
+            with tempfile.TemporaryDirectory() as directory:
+                post = Mock(return_value=(504, body))
+                result = client.execute_once(SimpleNamespace(w=SimpleNamespace(http_post=post)), {"code": "display 1"},
+                    Path(directory) / "receipt", observe=Mock(side_effect=[self.cold(), self.cold()]))
+                self.assertEqual(result["verdict"], "REFUSED_NOT_DISPATCHED")
+                self.assertEqual(result["refusal"]["reasonCode"], "PRE_RUN_BACKEND_WARMUP_TIMEOUT")
+                self.assertTrue(result["refusal"]["retryable"])
+                self.assertEqual(post.call_count, 1)
+        stop = dict(envelope, status=409, reasonCode="PRE_RUN_BACKEND_WARMUP_CANCELLED", retryable=False, retryAfterMs=None)
+        self.assertFalse(client.prerun_refusal(409, stop)["retryable"])
+        for unsure in (dict(envelope, payloadDispatched=None), dict(envelope, reasonCode="EXEC_GUARD_FAILED"),
+                       dict(envelope, preRunStage="snapshot")):
+            self.assertIsNone(client.prerun_refusal(504, unsure), "not an explicit pre-dispatch refusal")
+        self.assertIsNone(client.prerun_refusal(200, envelope))
+
+    def test_wait_ready_accepts_cold_backend(self):
+        sleep = Mock()
+        got = client.wait_ready(SimpleNamespace(), 10, observe=lambda _: self.cold(), clock=lambda: 0, sleep=sleep)
+        self.assertEqual(got["status"]["ownedBackendPids"], [])
+        sleep.assert_not_called()
 
 
 if __name__ == "__main__":

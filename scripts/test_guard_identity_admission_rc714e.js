@@ -324,11 +324,18 @@ t("D.3 POST /force-reset 不经就绪门禁（结构断言：直接调 __codexFo
   assert.ok(!/acquireDecision|__codexTrueReadyStatus/.test(seg),
     "force-reset 竟经过就绪门禁 → 身份坏会把恢复堵死：" + seg.slice(0, 120));
 });
-t("D.4 GET /status 无条件 200（身份坏时仍可观测）", () => {
-  const at = SRC.indexOf("__req.url===\"/status\"");
-  assert.ok(at > 0, "找不到 /status 路由");
-  const seg = SRC.slice(at, at + 160);
-  assert.ok(/__send\(__res,200,__current\(\)\)/.test(seg), "status 非无条件 200：" + seg.slice(0, 120));
+t("D.4 authenticated GET /status stays observable while identity bad or closing", () => {
+  const {between,attachLifecycle}=require("./test_daily_bundle_helpers");
+  const route=between(SRC,'if(__req.method==="GET"&&__req.url==="/status"){','if(__req.method==="POST"&&String(__req.url||"").startsWith("/session-close?"))');
+  for(const closing of [false,true]){
+    const client={};const life=attachLifecycle(client);if(closing)life.shutdown();
+    let response;
+    new Function("zg","__req","__res","__current","__send",route)(client,{method:"GET",url:"/status"},{},
+      ()=>({trueReady:false,status:"identity-unreadable"}),(_r,status,body)=>{response={status,body};});
+    assert.strictEqual(response.status,200);
+    assert.strictEqual(response.body.trueReady,false);
+    assert.strictEqual(response.body.status,closing?"closing":"identity-unreadable");
+  }
 });
 
 console.log("\n[E] 结构契约：单点策略、四处回退、不破坏既有次序");

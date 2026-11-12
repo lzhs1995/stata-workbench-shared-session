@@ -15,10 +15,6 @@ This project also incorporates design comparisons, compatibility lessons, or sep
   License: MIT
   Copyright (c) 2025 Lu Han
 
-The extension icon (media/icon.png) was added by the repository owner in commit
-99683e3 (2026-05-19). It is not the upstream project's icon and is distributed
-with this project under the same terms.
-
 No Stata binaries, Stata license files, private research datasets, or private research outputs are included in this repository.
 
 Stata is a trademark of StataCorp LLC. This project is not affiliated with or endorsed by StataCorp LLC.

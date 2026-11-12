@@ -92,18 +92,18 @@ test("write corruption is still repaired before source is admitted", (t) => {
 
 test("driver still passes the body through the real Mac compatibility adapter", (t) => {
   const dir = temp(t);
-  const author = 'cd "C:\\Users\\example\\Desktop\\example-project\\tasks\\07_Stata-workbench\\示例工作区"\nexit 601\n';
+  const author = 'cd "C:\\Users\\Example Analyst\\Desktop\\Study Project\\模型"\nexit 601\n';
   const record = writer()(dir, author, runId, path.join(dir, "author.do"), "test");
   const before = fs.readFileSync(record.tempDoFile);
   const prepared = compat.prepareExecutionCode(record.executionCode, {
     platform: "darwin", cwd: dir, tempRoot: dir,
-    stataRoot: "/Users/fixture/stata", cnmRoot: "/Users/fixture/example-project", documentsRoot: "/Users/fixture"
+    sourcePathMappings: [{ from: "C:/Users/Example Analyst/Desktop/Study Project", to: "/Users/fixture/projects/Study Project" }]
   });
   assert.equal(prepared.diagnostics.referencedDoCopies.length, 1);
   const copy = prepared.diagnostics.referencedDoCopies[0];
   assert.equal(copy.sourceSha256, sha(before));
   assert.equal(fs.readFileSync(record.tempDoFile).equals(before), true);
-  assert.ok(fs.readFileSync(copy.tempPath, "utf8").includes("/Users/fixture/example-project/tasks/07_Stata-workbench/示例工作区"));
+  assert.ok(fs.readFileSync(copy.tempPath, "utf8").includes("/Users/fixture/projects/Study Project/模型"));
   assert.ok(prepared.code.includes('capture noisily do "' + copy.tempPath.replace(/\\/g, "/") + '"'));
 });
 

@@ -47,6 +47,9 @@ async function reconnect(checkpoint, platform, connectMs) {
     zg: { connect: () => connectMs == null ? new Promise(() => {}) : new Promise(resolve => setTimeout(resolve, Math.round(connectMs / 1000))) },
     globalThis: { __codexStopCheckpointRef: { forceResetReconnectTimeoutMs: () => checkpoint.forceResetReconnectTimeoutMs(platform, {}) } },
   };
+  const life = require("./test_daily_bundle_helpers").attachLifecycle(ctx.zg);
+  const token = life.token();
+  ctx.__shutdownResetCheck = () => life.assert(token);
   vm.createContext(ctx);
   return vm.runInContext(`(async () => { ${race} return __reconnect; })()`, ctx);
 }
