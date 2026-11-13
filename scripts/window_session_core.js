@@ -164,25 +164,61 @@ async function inspectRuntimeSource(source, { platform, env, home, probeRuntime,
   return { python, versions, pythonVersion: facts.version, root: real(source.root), canonicalRoot: root };
 }
 
-// Content identity of the source snapshot, including internal symlinks without
-// following them outside the environment. Timestamps alone cannot bind bytes.
-async function runtimeTreeSha256(root, checkOpen) {
-  const hash = crypto.createHash("sha256");
-  async function walk(directory, relative = "") {
-    for (const name of (await fs.promises.readdir(directory)).sort()) {
-      checkOpen();
-      const file = path.join(directory, name), key = relative ? relative + "/" + name : name;
-      const stat = await fs.promises.lstat(file);
-      if (stat.isSymbolicLink()) hash.update(JSON.stringify(["link", key, await fs.promises.readlink(file)]) + "\n");
-      else if (stat.isDirectory()) { hash.update(JSON.stringify(["dir", key]) + "\n"); await walk(file, key); }
-      else if (stat.isFile()) {
-        const content = crypto.createHash("sha256");
-        for await (const chunk of fs.createReadStream(file)) { checkOpen(); content.update(chunk); }
-        hash.update(JSON.stringify(["file", key, stat.mode & 0o777, content.digest("hex")]) + "\n");
-      } else throw failure("RUNTIME_SOURCE_INVALID", `unsupported runtime source entry: ${file}`);
-    }
+// One cap for all directories and concurrent source/staging checks in this host.
+// A file stream owns its permit until closed; failed/closing walks drain their
+// outstanding work before returning, so no background reader escapes the check.
+const RUNTIME_HASH_IO_LIMIT = 8;
+let runtimeHashIoActive = 0;
+const runtimeHashIoWaiters = [];
+async function withRuntimeHashIo(check, action) {
+  if (runtimeHashIoActive >= RUNTIME_HASH_IO_LIMIT) await new Promise(resolve => runtimeHashIoWaiters.push(resolve));
+  else runtimeHashIoActive++;
+  try { check(); return await action(); }
+  finally {
+    if (runtimeHashIoWaiters.length) runtimeHashIoWaiters.shift()();
+    else runtimeHashIoActive--;
   }
-  await walk(root); checkOpen(); return hash.digest("hex");
+}
+
+// Content identity of the source snapshot, including internal symlinks without
+// following them outside the environment. Hash records retain sorted depth-first
+// order regardless of I/O completion order, exactly matching the serial format.
+async function runtimeTreeSha256(root, checkOpen, io = fs) {
+  const hash = crypto.createHash("sha256");
+  let failed = null;
+  const check = () => { if (failed) throw failed; checkOpen(); };
+  const read = async (action) => {
+    try { return await withRuntimeHashIo(check, action); }
+    catch (error) { failed ||= error; throw error; }
+  };
+  async function walk(directory, relative = "") {
+    const names = (await read(() => io.promises.readdir(directory))).sort();
+    check();
+    const entries = await Promise.allSettled(names.map(async (name) => {
+      try {
+        const file = path.join(directory, name), key = relative ? relative + "/" + name : name;
+        const stat = await read(() => io.promises.lstat(file));
+        check();
+        if (stat.isSymbolicLink()) return JSON.stringify(["link", key, await read(() => io.promises.readlink(file))]) + "\n";
+        if (stat.isDirectory()) return [JSON.stringify(["dir", key]) + "\n", await walk(file, key)];
+        if (stat.isFile()) {
+          const digest = await read(async () => {
+            const content = crypto.createHash("sha256");
+            for await (const chunk of io.createReadStream(file)) { check(); content.update(chunk); }
+            return content.digest("hex");
+          });
+          return JSON.stringify(["file", key, stat.mode & 0o777, digest]) + "\n";
+        }
+        throw failure("RUNTIME_SOURCE_INVALID", `unsupported runtime source entry: ${file}`);
+      } catch (error) { failed ||= error; throw error; }
+    }));
+    check();
+    return entries.map(entry => entry.value);
+  }
+  function append(records) {
+    for (const record of records) { check(); if (Array.isArray(record)) append(record); else hash.update(record); }
+  }
+  append(await walk(root)); check(); return hash.digest("hex");
 }
 
 function runtimeDirectoryIdentity(runtime) {
@@ -438,4 +474,4 @@ function createWindowSession(options = {}) {
 }
 
 module.exports = { createWindowSession, configuredPort, configuredDiskReserve, configuredRuntimeRoot, defaultRuntimeRoot,
-  inspectRuntimeSource, runtimePython, selectRuntimeSource, RUNTIME_PROBE };
+  inspectRuntimeSource, runtimePython, runtimeTreeSha256, selectRuntimeSource, RUNTIME_PROBE };

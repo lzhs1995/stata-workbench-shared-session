@@ -8,6 +8,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
 const cp = require("node:child_process");
+const crypto = require("node:crypto");
 const core = require("./window_session_core");
 const { venvProbe } = require("./runtime_source_fixture");
 const { createWindowSession, configuredRuntimeRoot, selectRuntimeSource, inspectRuntimeSource, RUNTIME_PROBE } = core;
@@ -22,6 +23,78 @@ const LEGACY_WRAPPER = { command: "C:\\Users\\Example\\AppData\\Roaming\\uv\\pyt
   configPath: "C:\\Users\\Example\\AppData\\Roaming\\Code\\User\\mcp.json" };
 const select = (base, input) => selectRuntimeSource({ ...base, ...input });
 const HOST = process.platform === "win32" ? "win32" : "darwin";
+
+function hashFixture(t) {
+  const root = tempRoot(t);
+  for (const directory of ["a", "a!", "a/child", "b", "b/child", "z"]) {
+    fs.mkdirSync(path.join(root, directory), { recursive: true });
+    for (let i = 0; i < 64; i++) fs.writeFileSync(path.join(root, directory, `file-${i}`), `${directory}:${i}\n`, { mode: i % 2 ? 0o600 : 0o644 });
+  }
+  fs.writeFileSync(path.join(root, "a-"), "sibling after the a directory subtree");
+  if (process.platform !== "win32") fs.symlinkSync("a/file-1", path.join(root, "link"));
+  return root;
+}
+
+// Independent serial reference for the published record format; completion
+// order, directory boundaries, permissions and link text must not change it.
+function serialTreeHash(root) {
+  const hash = crypto.createHash("sha256");
+  function visit(dir, relative = "") {
+    for (const name of fs.readdirSync(dir).sort()) {
+      const file = path.join(dir, name), key = relative ? relative + "/" + name : name, stat = fs.lstatSync(file);
+      if (stat.isSymbolicLink()) hash.update(JSON.stringify(["link", key, fs.readlinkSync(file)]) + "\n");
+      else if (stat.isDirectory()) { hash.update(JSON.stringify(["dir", key]) + "\n"); visit(file, key); }
+      else hash.update(JSON.stringify(["file", key, stat.mode & 0o777, crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex")]) + "\n");
+    }
+  }
+  visit(root); return hash.digest("hex");
+}
+
+function observedHashIo(options = {}) {
+  const counts = { active: 0, maximum: 0, streams: 0 };
+  const enter = () => { counts.active++; counts.maximum = Math.max(counts.maximum, counts.active); };
+  const pause = () => new Promise(resolve => setTimeout(resolve, 1));
+  const operation = async (name, args) => {
+    enter();
+    try { await pause(); if (options.fail && options.fail(name, args[0])) throw Object.assign(new Error("read failed"), { code: "EIO" });
+      return await fs.promises[name](...args); }
+    finally { counts.active--; }
+  };
+  const io = { promises: Object.fromEntries(["readdir", "lstat", "readlink"].map(name => [name, (...args) => operation(name, args)])),
+    createReadStream: async function* (file) {
+      enter(); counts.streams++;
+      try { await pause(); for await (const chunk of fs.createReadStream(file)) { if (options.onChunk) options.onChunk(); yield chunk; } }
+      finally { counts.active--; }
+    } };
+  return { io, counts };
+}
+
+test("runtime hashing preserves the serial format with at most eight I/O operations across concurrent walks", async (t) => {
+  const root = hashFixture(t), expected = serialTreeHash(root), { io, counts } = observedHashIo();
+  const results = await Promise.all([core.runtimeTreeSha256(root, () => {}, io), core.runtimeTreeSha256(root, () => {}, io)]);
+  assert.deepEqual(results, [expected, expected]); assert.equal(counts.active, 0);
+  assert.ok(counts.maximum > 1 && counts.maximum <= 8, JSON.stringify(counts));
+});
+
+test("runtime hash errors drain pending reads and release all eight permits", async (t) => {
+  const root = hashFixture(t); let fail = true;
+  const { io, counts } = observedHashIo({ fail: (name, file) => fail && name === "lstat" && path.basename(file) === "file-17" });
+  await assert.rejects(core.runtimeTreeSha256(root, () => {}, io), { code: "EIO" });
+  assert.equal(counts.active, 0); assert.ok(counts.maximum <= 8);
+  fail = false;
+  assert.equal(await core.runtimeTreeSha256(root, () => {}, io), serialTreeHash(root));
+  assert.equal(counts.active, 0); assert.ok(counts.maximum <= 8);
+});
+
+test("closing cancels a runtime hash, drains its readers and leaves other walks usable", async (t) => {
+  const root = hashFixture(t); let closed = false, chunks = 0;
+  const { io, counts } = observedHashIo({ onChunk: () => { if (++chunks >= 4) closed = true; } });
+  await assert.rejects(core.runtimeTreeSha256(root, () => {
+    if (closed) throw Object.assign(new Error("closing"), { code: "SESSION_CLOSING" });
+  }, io), { code: "SESSION_CLOSING" });
+  assert.equal(counts.active, 0); assert.ok(counts.maximum <= 8);
+  assert.equal(await core.runtimeTreeSha256(root, () => {}), serialTreeHash(root));
+});
 
 test("explicit sources rank window setting, server env, host env, then a standard venv command", () => {
   const venv = { command: "C:\\venvs\\stata\\Scripts\\python.exe", args: ["-m", "mcp_stata"] };
