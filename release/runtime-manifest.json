@@ -511,8 +511,8 @@
       "bytes": 21851
     },
     "tools/workbench_setup.py": {
-      "sha256": "6e9cee5da17322ac70cd6f1437d72071f74ed7ce456c87fb35d9964c2d1f9698",
-      "bytes": 17615
+      "sha256": "00ec80cb2c8d697cef82b31a2851b7b2960934c47634a870e7cc8df17465c28f",
+      "bytes": 21595
     },
     "tools/stata_session.py": {
       "sha256": "4eba30ad10bdc806a7068b8726f8780ee146bfc7e8b0114ff702c5dc670f509e",
