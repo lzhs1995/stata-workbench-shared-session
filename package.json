@@ -207,6 +207,12 @@
           ],
           "description": "Minimum free disk space after preparing this window's runtime. 0 uses the platform default (macOS 20 GiB, Windows 10 GiB). An explicit workspace value must be at least 10 GiB. Capacity is checked again for each runtime copy."
         },
+        "stataMcp.runtimeRoot": {
+          "type": "string",
+          "default": "",
+          "scope": "machine-overridable",
+          "markdownDescription": "Absolute folder of the mcp-stata 1.26.1 virtual environment this window copies its private runtime from. Empty selects automatically: `MCP_STATA_RUNTIME_ROOT`, a standard `<venv>/bin/python3 -m mcp_stata` (Windows `<venv>\\Scripts\\python.exe`) server, or the managed runtime. A value set here wins and is never replaced by another source: an invalid folder stops the session with the reason. Set it per workspace when an existing MCP configuration starts mcp_stata through a custom wrapper. MCP configurations are not changed."
+        },
         "stataMcp.sourcePathMappings": {
           "type": "array",
           "default": [],

@@ -66,8 +66,20 @@ agent 工具所需的 Python 3.10 或更高版本。还须先准备匹配的 Sta
 装好 VSIX 不能证明这些依赖已存在或可用。
 
 运行时通常位于 macOS 的 `~/.local/share/stata-workbench/mcp-stata-1.26.1`，或 Windows 的
-`%LOCALAPPDATA%\stata-workbench\mcp-stata-1.26.1`。显式绝对路径 `MCP_STATA_RUNTIME_ROOT`
-或已配置的服务 Python 可选择其他来源。每个启动的窗口都会准备自己的运行时副本。
+`%LOCALAPPDATA%\stata-workbench\mcp-stata-1.26.1`。每个启动的窗口按以下顺序选一个来源，
+复制成自己的运行时副本：
+
+1. `stataMcp.runtimeRoot` 设置（工作区文件夹、工作区、用户依次优先）；
+2. MCP server `env` 里的 `MCP_STATA_RUNTIME_ROOT`，其次是 VS Code 进程环境里的同名变量；
+3. 用虚拟环境自己的 Python 以 `-m mcp_stata` 启动的 server（`<venv>/bin/python3`，Windows 为
+   `<venv>\Scripts\python.exe`）；
+4. 上面的受管运行时；server 是标准 `uvx ... mcp-stata` 启动或没有 MCP 配置时也用它。
+
+计算副本大小之前，先用一次隔离的元数据查询（`python -I -B`，不导入 `mcp_stata`、不启动 Stata）
+核对来源：必须是以该文件夹为自身 prefix 的虚拟环境，且含 `mcp-stata==1.26.1` 和 MCP 1.x。
+显式指定的来源核对失败时直接停止并说明原因，不改用其他来源。其他启动方式（例如 base Python
+运行自定义 wrapper 脚本）会报 `RUNTIME_SOURCE_UNSUPPORTED`；不必改原 MCP 配置，在当前工作区设置
+`"stataMcp.runtimeRoot"` 为已验证的 mcp-stata 1.26.1 虚拟环境的绝对路径即可。
 复制**之后**，macOS 至少保留 20 GiB、Windows 至少保留 10 GiB 可用空间；不足时拒绝启动。
 这些是候选版要求，不是当前实机测试已通过的声明。
 
@@ -196,6 +208,7 @@ CLI 还接受放在子命令**之前**的 `--state-root /absolute/path`，它选
 | `sessions` 中没有目标会话 | 核对已安装扩展、配置及状态根目录，在目标窗口手动 Start |
 | `SESSION_LIMIT` | 已有两个引擎或清理尚未确认的占位；完成或关闭目标会话并核实清理，不要删除占位文件 |
 | `RUNTIME_SOURCE_MISSING` 或依赖错误 | 准备匹配服务运行时；只装 VSIX 不够 |
+| `RUNTIME_SOURCE_UNSUPPORTED`、`RUNTIME_SOURCE_INVALID` 或 `RUNTIME_INVALID` | 在工作区设置 `stataMcp.runtimeRoot` 为已验证的 mcp-stata 1.26.1 虚拟环境绝对路径；报错会写出被拒来源和受管路径 |
 | `DISK_RESERVE` | 准备运行时副本前恢复要求的可用空间 |
 | 身份或 bundle 不匹配 | 使用匹配的已安装工具并检查原窗口，不绕过检查或改投目标 |
 | `unknown-no-retry` / `EXECUTION_UNCONFIRMED_NO_RETRY` | 核对原 workflow 与回执，绝不盲目重交 |

@@ -1,7 +1,7 @@
 "use strict";
 
 const path = require("node:path");
-const { createWindowSession, configuredPort } = require("./window_session_core");
+const { createWindowSession, configuredPort, configuredRuntimeRoot } = require("./window_session_core");
 
 // Thin VS Code adapter. Configuration is scoped to this client instance;
 // process.env and the user's global/workspace settings are never rewritten.
@@ -19,6 +19,8 @@ function install(context, vscode, client, options = {}) {
     ...options,
     minimumFreeDiskGiB: cfg.get ? cfg.get("minimumFreeDiskGiB", 0) : 0,
     workspacePath: folders[0] && folders[0].uri.fsPath,
+    // Read when the session starts, so a corrected setting applies without reinstalling.
+    windowRuntimeRoot: () => configuredRuntimeRoot(vscode.workspace.getConfiguration("stataMcp", folders[0] && folders[0].uri)),
     label: "stata",
     patchRuntime: options.patchRuntime || ((input) => require("./mcp_stata_runtime_patch").patchRuntime(input)),
     onState: (state) => {
@@ -46,7 +48,7 @@ function install(context, vscode, client, options = {}) {
   manager.registryFields = () => ({ ...manager.status(),
     ordinaryWindow: true, extensionPath: context.extensionUri.fsPath,
     profilePath: path.join(manager.stateRoot, "runs", manager.sessionId),
-    runtime: { configPath: manager.getConfig() && manager.getConfig().configPath },
+    runtime: { configPath: manager.getConfig() && manager.getConfig().configPath, source: manager.getRuntimeSource() },
     dirs: { tempDir: manager.dirs.tmp, checkpointDir: manager.dirs.checkpoints,
       logDir: manager.dirs["mcp-temp"], graphDir: manager.dirs["mcp-temp"] },
   });

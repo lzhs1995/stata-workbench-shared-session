@@ -8,6 +8,7 @@ const path = require("node:path");
 const cp = require("node:child_process");
 const { createWindowSession, configuredDiskReserve } = require("./window_session_core");
 const { authorityRoot } = require("./window_session_admission");
+const { venvProbe } = require("./runtime_source_fixture");
 
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 function deferred() { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; }
@@ -18,7 +19,8 @@ function fixture(t, platform = "darwin") {
   const python = platform === "win32" ? path.join(source, "Scripts", "python.exe") : path.join(source, "bin", "python3");
   fs.mkdirSync(path.dirname(python), { recursive: true });
   fs.writeFileSync(python, "synthetic-python");
-  const options = { home: root, stateRoot: path.join(root, "state-A"), platform,
+  fs.mkdirSync(path.join(source, ...(platform === "win32" ? ["Lib"] : ["lib", "python3.11"]), "site-packages"), { recursive: true });
+  const options = { home: root, stateRoot: path.join(root, "state-A"), platform, probeRuntime: venvProbe(platform),
     readBootIdentity: () => platform === "win32" ? { platform, id: "2026-11-12T02:30:00.000Z" }
       : { platform, id: "22222222-2222-4222-8222-222222222222" },
     env: { MCP_STATA_RUNTIME_ROOT: source }, runtimeCopyWaitMs: 5000,
@@ -214,7 +216,7 @@ test("actual processes with different state roots use the same filesystem copy l
     const sleep=ms=>new Promise(r=>setTimeout(r,ms));
     const s=createWindowSession({home:root,stateRoot:path.join(root,'state-'+label),platform:'darwin',runtimeCopyWaitMs:2000,
       readBootIdentity:()=>({platform:'darwin',id:'22222222-2222-4222-8222-222222222222'}),
-      env:{MCP_STATA_RUNTIME_ROOT:path.join(root,'source')},
+      env:{MCP_STATA_RUNTIME_ROOT:path.join(root,'source')},probeRuntime:require(process.argv[4]).venvProbe('darwin'),
       snapshotProcesses:()=>[{pid:process.pid,ppid:1,birth:'2026-01-01T10:00:00Z'}],
       statfsSync:()=>{fs.writeFileSync(path.join(root,'checked-'+label),'1');return {bavail:100,bsize:1024**3}},
       cloneRuntime:async(a,b)=>{fs.writeFileSync(path.join(root,'entered-'+label),'1');
@@ -226,7 +228,8 @@ test("actual processes with different state roots use the same filesystem copy l
   const children = [];
   t.after(() => { for (const child of children) if (child.exitCode === null) child.kill(); });
   function start(label) {
-    const child = cp.spawn(process.execPath, ["-e", worker, require.resolve("./window_session_core"), f.root, label], { stdio: ["ignore", "pipe", "pipe"] });
+    const child = cp.spawn(process.execPath, ["-e", worker, require.resolve("./window_session_core"), f.root, label,
+      require.resolve("./runtime_source_fixture")], { stdio: ["ignore", "pipe", "pipe"] });
     children.push(child);
     return new Promise((resolve, reject) => {
       let output = "", errors = "";

@@ -11,6 +11,7 @@ const cp = require("node:child_process");
 const { promisify } = require("node:util");
 const { createWindowSession, configuredPort } = require("./window_session_core");
 const { createBridgeBinder } = require("./bridge_rebind_core");
+const { venvProbe } = require("./runtime_source_fixture");
 
 function fixture(t) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "wb-window-test-"));
@@ -18,7 +19,8 @@ function fixture(t) {
   const source = path.join(root, "source");
   fs.mkdirSync(path.join(source, "bin"), { recursive: true });
   fs.writeFileSync(path.join(source, "bin", "python3"), "fixture-python");
-  return { root, home: root, source, env: { MCP_STATA_RUNTIME_ROOT: source },
+  fs.mkdirSync(path.join(source, "lib", "python3.11", "site-packages"), { recursive: true });
+  return { root, home: root, source, env: { MCP_STATA_RUNTIME_ROOT: source }, probeRuntime: venvProbe("darwin"),
     stateRoot: path.join(root, "state"), platform: "darwin",
     readBootIdentity: () => ({ platform: "darwin", id: "22222222-2222-4222-8222-222222222222" }),
     snapshotProcesses: () => [{ pid: process.pid, ppid: 1, birth: "2026-01-01T10:00:00Z", command: "Code Helper" }],

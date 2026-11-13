@@ -69,8 +69,19 @@ Next 仍是開發分支。隔離啟動器、五工作階段測試、`~/.stata-wo
 
 macOS 的預設執行環境位置是 `~/.local/share/stata-workbench/mcp-stata-1.26.1`；
 Windows 是 `%LOCALAPPDATA%\stata-workbench\mcp-stata-1.26.1`。
-可透過絕對路徑 `MCP_STATA_RUNTIME_ROOT` 或已設定的服務 Python 指定其他來源。
-每個啟動的視窗會準備自己的執行環境副本。複製**完成後**，macOS 必須至少保留
+每個啟動的視窗依下列順序選一個來源，複製成自己的執行環境副本：
+
+1. `stataMcp.runtimeRoot` 設定（工作區資料夾、工作區、使用者依序優先）；
+2. MCP server `env` 中的 `MCP_STATA_RUNTIME_ROOT`，其次是 VS Code 行程環境中的同名變數；
+3. 以虛擬環境自身的 Python 用 `-m mcp_stata` 啟動的 server（`<venv>/bin/python3`，Windows 為
+   `<venv>\Scripts\python.exe`）；
+4. 上述受管執行環境；server 為標準 `uvx ... mcp-stata` 啟動或沒有 MCP 設定時也使用它。
+
+計算副本大小之前，先以一次隔離的中繼資料查詢（`python -I -B`，不匯入 `mcp_stata`、不啟動 Stata）
+核對來源：必須是以該資料夾為自身 prefix 的虛擬環境，並含 `mcp-stata==1.26.1` 與 MCP 1.x。
+明確指定的來源核對失敗時直接停止並說明原因，不改用其他來源。其他啟動方式（例如 base Python
+執行自訂 wrapper 腳本）會回報 `RUNTIME_SOURCE_UNSUPPORTED`；不必修改原 MCP 設定，在目前工作區
+設定 `"stataMcp.runtimeRoot"` 為已驗證的 mcp-stata 1.26.1 虛擬環境絕對路徑即可。複製**完成後**，macOS 必須至少保留
 20 GiB、Windows 至少保留 10 GiB 可用空間；不足時拒絕準備。
 這些是候選版要求，不是本候選版已通過實機測試的聲明。
 
@@ -204,6 +215,7 @@ CLI 也接受放在子命令**之前**的 `--state-root /absolute/path`，用來
 | `sessions` 沒有目標工作階段 | 核對已安裝擴充套件、設定檔及狀態根目錄；在目標視窗手動 Start |
 | `SESSION_LIMIT` | 已有兩個引擎或尚未確認清理的名額；完成／關閉指定工作階段並核對清理結果，不要刪除名額檔案 |
 | `RUNTIME_SOURCE_MISSING`／相依套件錯誤 | 備妥相符的服務執行環境；只安裝 VSIX 並不足夠 |
+| `RUNTIME_SOURCE_UNSUPPORTED`／`RUNTIME_SOURCE_INVALID`／`RUNTIME_INVALID` | 在工作區設定 `stataMcp.runtimeRoot` 為已驗證的 mcp-stata 1.26.1 虛擬環境絕對路徑；錯誤訊息會寫出被拒來源與受管路徑 |
 | `DISK_RESERVE` | 準備執行環境副本前，先恢復要求的可用空間 |
 | 身分／bundle 不相符 | 使用相符的已安裝工具並檢查原視窗；不要繞過檢查或改投別處 |
 | `unknown-no-retry`／`EXECUTION_UNCONFIRMED_NO_RETRY` | 核對原 workflow 與回執，不要盲目重新提交 |

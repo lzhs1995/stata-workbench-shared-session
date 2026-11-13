@@ -80,9 +80,28 @@ and compatible MCP 1.x (the repository constraints pin `mcp==1.28.1`).
 Installing a VSIX does not establish that these dependencies exist or work.
 
 The runtime is normally at `~/.local/share/stata-workbench/mcp-stata-1.26.1` on
-macOS, or `%LOCALAPPDATA%\stata-workbench\mcp-stata-1.26.1` on Windows. An explicit
-absolute `MCP_STATA_RUNTIME_ROOT` or configured service Python selects another
-source. Each started window prepares a private runtime copy. Keep at least
+macOS, or `%LOCALAPPDATA%\stata-workbench\mcp-stata-1.26.1` on Windows. Each
+started window prepares a private copy of one source, chosen in this order:
+
+1. the `stataMcp.runtimeRoot` setting (workspace folder, then workspace, then user);
+2. `MCP_STATA_RUNTIME_ROOT` in the MCP server's `env`, then in the VS Code process;
+3. a server that runs a virtual environment's own Python with `-m mcp_stata`
+   (`<venv>/bin/python3`, or `<venv>\Scripts\python.exe` on Windows);
+4. the managed runtime above, also when the server is the standard
+   `uvx ... mcp-stata` launch or there is no MCP configuration.
+
+Before the copy is sized, the source is checked with a short isolated metadata
+query (`python -I -B`; it neither imports `mcp_stata` nor starts Stata): it must
+be a virtual environment whose own prefix is the folder and which contains
+`mcp-stata==1.26.1` and MCP 1.x. An explicit choice that fails this check stops
+the session with the reason; no other source is tried. A server that starts
+mcp_stata through any other command, such as a base Python running a wrapper
+script, is refused with `RUNTIME_SOURCE_UNSUPPORTED`. Fix it for this workspace,
+without editing the existing MCP configuration:
+
+```json
+{ "stataMcp.runtimeRoot": "C:\\Users\\you\\AppData\\Local\\stata-workbench\\mcp-stata-1.26.1" }
+``` Keep at least
 20 GiB free on macOS or 10 GiB on Windows **after** that copy; admission refuses
 insufficient space. These are candidate requirements, not current live-test claims.
 
@@ -232,6 +251,7 @@ Do not copy tokens or hand-edit session ownership records.
 | No intended session in `sessions` | Verify the installed extension/profile and state root; manually Start in the intended window |
 | `SESSION_LIMIT` | Two engines or unresolved cleanup slots already exist; finish/close the intended session and verify cleanup, without deleting slot files |
 | `RUNTIME_SOURCE_MISSING` / dependency error | Prepare the matching service runtime; installing a VSIX alone is insufficient |
+| `RUNTIME_SOURCE_UNSUPPORTED` / `RUNTIME_SOURCE_INVALID` / `RUNTIME_INVALID` | Set `stataMcp.runtimeRoot` in the workspace to the absolute folder of a verified mcp-stata 1.26.1 virtual environment; the message names the rejected source and the managed path |
 | `DISK_RESERVE` | Restore the required free space before preparing a runtime copy |
 | Identity/bundle mismatch | Use matching installed tools and inspect the original window; do not bypass or switch target |
 | `unknown-no-retry` / `EXECUTION_UNCONFIRMED_NO_RETRY` | Reconcile original workflow/receipt; never blindly resubmit |
