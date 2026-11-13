@@ -159,7 +159,55 @@ async function inspectRuntimeSource(source, { platform, env, home, probeRuntime,
       throw invalid(`loads ${name} from outside the environment`);
     versions[name] = found.version;
   }
-  return { python, versions, pythonVersion: facts.version };
+  // Copy the directory this probe verified, not a root symlink to it. cp -R
+  // otherwise preserves that symlink and patching the "copy" mutates the source.
+  return { python, versions, pythonVersion: facts.version, root: real(source.root), canonicalRoot: root };
+}
+
+// Content identity of the source snapshot, including internal symlinks without
+// following them outside the environment. Timestamps alone cannot bind bytes.
+async function runtimeTreeSha256(root, checkOpen) {
+  const hash = crypto.createHash("sha256");
+  async function walk(directory, relative = "") {
+    for (const name of (await fs.promises.readdir(directory)).sort()) {
+      checkOpen();
+      const file = path.join(directory, name), key = relative ? relative + "/" + name : name;
+      const stat = await fs.promises.lstat(file);
+      if (stat.isSymbolicLink()) hash.update(JSON.stringify(["link", key, await fs.promises.readlink(file)]) + "\n");
+      else if (stat.isDirectory()) { hash.update(JSON.stringify(["dir", key]) + "\n"); await walk(file, key); }
+      else if (stat.isFile()) {
+        const content = crypto.createHash("sha256");
+        for await (const chunk of fs.createReadStream(file)) { checkOpen(); content.update(chunk); }
+        hash.update(JSON.stringify(["file", key, stat.mode & 0o777, content.digest("hex")]) + "\n");
+      } else throw failure("RUNTIME_SOURCE_INVALID", `unsupported runtime source entry: ${file}`);
+    }
+  }
+  await walk(root); checkOpen(); return hash.digest("hex");
+}
+
+function runtimeDirectoryIdentity(runtime) {
+  const stat = fs.lstatSync(runtime);
+  if (!stat.isDirectory() || stat.isSymbolicLink())
+    throw failure("RUNTIME_ORIGIN_UNVERIFIED", "the private runtime is not its original directory; preserve it for inspection");
+  return { dev: stat.dev, ino: stat.ino };
+}
+
+function readRuntimeOrigin(file, runtime) {
+  try {
+    if (!fs.lstatSync(file).isFile() || fs.lstatSync(file).isSymbolicLink()) throw new Error("not a regular receipt");
+    const receipt = JSON.parse(fs.readFileSync(file, "utf8")), identity = runtimeDirectoryIdentity(runtime);
+    if (receipt.schema !== "stata-window-runtime-origin/1" || !receipt.source || !receipt.provenance ||
+      typeof receipt.source.canonicalRoot !== "string" ||
+      !/^[a-f0-9]{64}$/.test(receipt.source.treeSha256 || "") ||
+      receipt.provenance.canonicalRoot !== receipt.source.canonicalRoot ||
+      receipt.provenance.contentSha256 !== receipt.source.treeSha256 ||
+      JSON.stringify(receipt.provenance.versions) !== JSON.stringify(receipt.source.versions) ||
+      JSON.stringify(receipt.provenance.pythonVersion) !== JSON.stringify(receipt.source.pythonVersion) ||
+      receipt.runtime?.dev !== identity.dev || receipt.runtime?.ino !== identity.ino) throw new Error("origin or directory mismatch");
+    return receipt;
+  } catch {
+    throw failure("RUNTIME_ORIGIN_UNVERIFIED", "the existing private runtime has no matching origin receipt; preserve it and start a new session");
+  }
 }
 
 function configuredPort(configuration) {
@@ -306,15 +354,24 @@ function createWindowSession(options = {}) {
       const verified = await inspectRuntimeSource(selected, { platform, env, home,
         probeRuntime: options.probeRuntime, realpath: options.realpathSync });
       checkOpen();
-      runtimeSource = { ...selected, python: verified.python, versions: verified.versions, pythonVersion: verified.pythonVersion };
-      const source = selected.root;
+      const source = verified.root;
+      const sourceIdentity = { canonicalRoot: verified.canonicalRoot, treeSha256: await runtimeTreeSha256(source, checkOpen),
+        versions: verified.versions, pythonVersion: verified.pythonVersion };
       const runtime = path.join(dataDir, "runtime");
-      if (!runtimePython(runtime, platform)) {
+      const originPath = path.join(dataDir, "runtime-origin.json");
+      function useOrigin() {
+        const origin = readRuntimeOrigin(originPath, runtime);
+        if (JSON.stringify(origin.source) !== JSON.stringify(sourceIdentity))
+          throw failure("RUNTIME_SOURCE_CHANGED", "the selected source differs from this window's copied runtime; preserve it and start a new session");
+        runtimeSource = origin.provenance;
+      }
+      if (fs.existsSync(runtime)) useOrigin();
+      else {
         await withRuntimeCopyLock(async (checkOwner) => {
           checkOpen();
-          if (runtimePython(runtime, platform)) return;
+          if (fs.existsSync(runtime)) { useOrigin(); return; }
           const staging = path.join(dataDir, "runtime.partial");
-          if (fs.existsSync(staging) || fs.existsSync(runtime)) throw failure("RUNTIME_INCOMPLETE", "a previous preparation needs inspection; it was not overwritten");
+          if (fs.existsSync(staging) || fs.existsSync(originPath)) throw failure("RUNTIME_INCOMPLETE", "a previous preparation needs inspection; it was not overwritten");
           const stat = (options.statfsSync || fs.statfsSync)(stateRoot);
           const reserve = minimumFreeDiskGiB;
           const available = stat.bavail * stat.bsize, needed = runtimeBytes(source);
@@ -324,13 +381,29 @@ function createWindowSession(options = {}) {
           checkOpen();
           if (options.cloneRuntime) await options.cloneRuntime(source, staging);
           else if (platform === "darwin") await execFile("/bin/cp", ["-c", "-R", source, staging], { timeout: 120000 });
-          else await fs.promises.cp(source, staging, { recursive: true, dereference: false, errorOnExist: true, force: false });
+          else await fs.promises.cp(source, staging, { recursive: true, dereference: false, verbatimSymlinks: true, errorOnExist: true, force: false });
           checkOpen();
           if (!runtimePython(staging, platform)) throw failure("RUNTIME_COPY_INVALID", "copied runtime has no Python executable");
+          runtimeDirectoryIdentity(staging);
+          if (await runtimeTreeSha256(source, checkOpen) !== sourceIdentity.treeSha256)
+            throw failure("RUNTIME_SOURCE_CHANGED", "the source changed while being copied; the partial copy was preserved");
+          if (await runtimeTreeSha256(staging, checkOpen) !== sourceIdentity.treeSha256)
+            throw failure("RUNTIME_COPY_INVALID", "the copied runtime differs from its verified source snapshot; the partial copy was preserved");
           checkOwner();
           fs.renameSync(staging, runtime);
+          const provenance = { ...selected, canonicalRoot: verified.canonicalRoot, contentSha256: sourceIdentity.treeSha256,
+            python: verified.python, versions: verified.versions, pythonVersion: verified.pythonVersion };
+          writePrivate(originPath, { schema: "stata-window-runtime-origin/1", source: sourceIdentity,
+            runtime: runtimeDirectoryIdentity(runtime), provenance });
+          runtimeSource = provenance;
         });
       }
+      checkOpen();
+      const copied = await inspectRuntimeSource({ root: runtime }, { platform, env, home,
+        probeRuntime: options.probeRuntime, realpath: options.realpathSync });
+      if (JSON.stringify(copied.versions) !== JSON.stringify(sourceIdentity.versions) ||
+        JSON.stringify(copied.pythonVersion) !== JSON.stringify(sourceIdentity.pythonVersion))
+        throw failure("RUNTIME_ORIGIN_UNVERIFIED", "the private runtime's interpreter or package versions differ from its recorded source");
       checkOpen();
       const childEnv = { ...(sourceConfig.env || {}), MCP_STATA_RUNTIME_ROOT: runtime,
         MCP_STATA_TEMP: dirs["mcp-temp"], TMPDIR: dirs.tmp, PYTHONPYCACHEPREFIX: dirs.pycache,

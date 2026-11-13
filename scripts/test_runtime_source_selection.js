@@ -217,6 +217,113 @@ test("a missing workspace runtimeRoot never falls back to a valid host or manage
   assert.deepEqual(f.counts, { statfs: 0, copies: 0 });
 });
 
+test("a failed patch binds the completed copy: changed source is refused, unchanged source can recover", async (t) => {
+  const f = windowFixture(t), a = syntheticVenv(path.join(f.root, "source-A"), HOST, "A"),
+    b = syntheticVenv(path.join(f.root, "source-B"), HOST, "B");
+  let chosen = a, patches = 0;
+  const session = createWindowSession({ ...f.options, windowRuntimeRoot: () => ({ root: chosen, scope: "workspace" }),
+    patchRuntime: () => ({ ok: ++patches > 1, status: "first patch failed" }) });
+  await assert.rejects(session.prepare({}), { code: "RUNTIME_PATCH_FAILED" });
+  const originPath = path.join(session.dataDir, "runtime-origin.json"), original = fs.readFileSync(originPath),
+    runtime = path.join(session.dataDir, "runtime");
+  assert.equal(session.getRuntimeSource().root, a);
+  chosen = b;
+  await assert.rejects(session.prepare({}), { code: "RUNTIME_SOURCE_CHANGED" });
+  assert.equal(fs.readFileSync(core.runtimePython(runtime, HOST), "utf8"), "A");
+  assert.equal(session.getRuntimeSource().root, a, "never report the rejected source as the copied source");
+  assert.deepEqual(fs.readFileSync(originPath), original, "the original receipt is immutable");
+  assert.equal(session.status().slot, null); assert.equal(patches, 1);
+  chosen = a;
+  const config = await session.prepare({});
+  assert.equal(fs.readFileSync(config.command, "utf8"), "A");
+  assert.deepEqual(f.counts, { statfs: 1, copies: 1 }); assert.equal(patches, 2);
+  await session.finishClose({ backendCleanup: "complete" });
+});
+
+test("source bytes changed at the same path are refused even when package versions are unchanged", async (t) => {
+  const f = windowFixture(t), source = syntheticVenv(path.join(f.root, "source"), HOST, "original");
+  const session = createWindowSession({ ...f.options, env: { MCP_STATA_RUNTIME_ROOT: source },
+    patchRuntime: () => ({ ok: false, status: "patch failed" }) });
+  await assert.rejects(session.prepare({}), { code: "RUNTIME_PATCH_FAILED" });
+  const original = session.getRuntimeSource().contentSha256;
+  fs.writeFileSync(core.runtimePython(source, HOST), "changed");
+  await assert.rejects(session.prepare({}), { code: "RUNTIME_SOURCE_CHANGED" });
+  assert.equal(session.getRuntimeSource().contentSha256, original);
+  assert.equal(fs.readFileSync(core.runtimePython(path.join(session.dataDir, "runtime"), HOST), "utf8"), "original");
+  assert.deepEqual(f.counts, { statfs: 1, copies: 1 });
+});
+
+for (const invalidOrigin of ["missing", "malformed", "provenance-mismatch", "different-directory"]) {
+  test(`a private runtime with ${invalidOrigin} origin proof is preserved and refused`, async (t) => {
+    const f = windowFixture(t), source = syntheticVenv(path.join(f.root, "source"), HOST);
+    let patches = 0;
+    const session = createWindowSession({ ...f.options, env: { MCP_STATA_RUNTIME_ROOT: source },
+      patchRuntime: () => { patches++; return { ok: false, status: "patch failed" }; } });
+    await assert.rejects(session.prepare({}), { code: "RUNTIME_PATCH_FAILED" });
+    const origin = path.join(session.dataDir, "runtime-origin.json"), runtime = path.join(session.dataDir, "runtime");
+    if (invalidOrigin === "missing") fs.unlinkSync(origin);
+    else if (invalidOrigin === "malformed") fs.writeFileSync(origin, "not JSON");
+    else if (invalidOrigin === "provenance-mismatch") {
+      const record = JSON.parse(fs.readFileSync(origin, "utf8")); record.provenance.contentSha256 = "0".repeat(64);
+      fs.writeFileSync(origin, JSON.stringify(record));
+    }
+    else { fs.renameSync(runtime, runtime + ".preserved"); fs.cpSync(source, runtime, { recursive: true }); }
+    await assert.rejects(session.prepare({}), { code: "RUNTIME_ORIGIN_UNVERIFIED" });
+    assert.ok(fs.existsSync(core.runtimePython(runtime, HOST))); assert.equal(patches, 1);
+    assert.deepEqual(f.counts, { statfs: 1, copies: 1 }); assert.equal(session.status().slot, null);
+  });
+}
+
+test("a copied runtime is re-probed before retrying a failed patch", async (t) => {
+  const f = windowFixture(t), source = syntheticVenv(path.join(f.root, "source"), HOST);
+  let invalid = false, patches = 0, session;
+  const probe = venvProbe(HOST), badProbe = venvProbe(HOST, (facts) => ({ ...facts, packages: {} }));
+  session = createWindowSession({ ...f.options, env: { MCP_STATA_RUNTIME_ROOT: source },
+    probeRuntime: (python, ...args) => (invalid && python.startsWith(session.dataDir) ? badProbe : probe)(python, ...args),
+    patchRuntime: () => { patches++; return { ok: false, status: "patch failed" }; } });
+  await assert.rejects(session.prepare({}), { code: "RUNTIME_PATCH_FAILED" });
+  invalid = true;
+  await assert.rejects(session.prepare({}), { code: "RUNTIME_SOURCE_INVALID" });
+  assert.equal(patches, 1); assert.deepEqual(f.counts, { statfs: 1, copies: 1 });
+});
+
+test("a source directory alias produces a private directory, and patching it leaves the source unchanged", async (t) => {
+  const f = windowFixture(t), source = syntheticVenv(path.join(f.root, "source"), HOST, "original"), alias = path.join(f.root, "alias");
+  fs.symlinkSync(source, alias, process.platform === "win32" ? "junction" : "dir");
+  if (process.platform !== "win32") fs.symlinkSync(path.basename(core.runtimePython(source, HOST)), path.join(source, "bin", "python-link"));
+  const cloneRuntime = process.platform === "linux" ? (a, b) => fs.promises.cp(a, b, { recursive: true, verbatimSymlinks: true }) : undefined;
+  const session = createWindowSession({ ...f.options, cloneRuntime, env: { MCP_STATA_RUNTIME_ROOT: alias },
+    patchRuntime: ({ runtimeRoot }) => { fs.writeFileSync(core.runtimePython(runtimeRoot, HOST), "private-patch"); return { ok: true }; } });
+  const config = await session.prepare({}), runtime = path.join(session.dataDir, "runtime");
+  assert.equal(fs.lstatSync(runtime).isSymbolicLink(), false);
+  assert.notEqual(fs.realpathSync(runtime), fs.realpathSync(source));
+  assert.equal(fs.readFileSync(core.runtimePython(source, HOST), "utf8"), "original");
+  assert.equal(fs.readFileSync(config.command, "utf8"), "private-patch");
+  if (process.platform !== "win32") assert.equal(fs.readlinkSync(path.join(runtime, "bin", "python-link")), path.basename(config.command));
+  await session.finishClose({ backendCleanup: "complete" });
+});
+
+for (const defect of ["source-changed", "copy-corrupted", "copy-failed"]) {
+  test(`${defect} leaves partial evidence without creating an origin binding`, async (t) => {
+    const f = windowFixture(t), source = syntheticVenv(path.join(f.root, "source"), HOST, "original");
+    const session = createWindowSession({ ...f.options, env: { MCP_STATA_RUNTIME_ROOT: source },
+      cloneRuntime: async (a, b) => {
+        await f.options.cloneRuntime(a, b);
+        if (defect === "source-changed") fs.writeFileSync(core.runtimePython(a, HOST), "changed");
+        else if (defect === "copy-corrupted") fs.writeFileSync(core.runtimePython(b, HOST), "corrupted");
+        else throw Object.assign(new Error("copy interrupted"), { code: "EIO" });
+      } });
+    const code = { "source-changed": "RUNTIME_SOURCE_CHANGED", "copy-corrupted": "RUNTIME_COPY_INVALID", "copy-failed": "EIO" }[defect];
+    await assert.rejects(session.prepare({}), { code });
+    assert.ok(fs.existsSync(path.join(session.dataDir, "runtime.partial")));
+    assert.equal(fs.existsSync(path.join(session.dataDir, "runtime")), false);
+    assert.equal(fs.existsSync(path.join(session.dataDir, "runtime-origin.json")), false);
+    assert.equal(session.getRuntimeSource(), null);
+    await assert.rejects(session.prepare({}), { code: "RUNTIME_INCOMPLETE" });
+    assert.deepEqual(f.counts, { statfs: 1, copies: 1 });
+  });
+}
+
 test("with no configuration the managed runtime remains the default", async (t) => {
   const f = windowFixture(t);
   const managed = HOST === "win32" ? path.join(f.root, "Local", "stata-workbench", "mcp-stata-1.26.1")
