@@ -101,7 +101,9 @@ without editing the existing MCP configuration:
 
 ```json
 { "stataMcp.runtimeRoot": "C:\\Users\\you\\AppData\\Local\\stata-workbench\\mcp-stata-1.26.1" }
-``` Keep at least
+```
+
+Keep at least
 20 GiB free on macOS or 10 GiB on Windows **after** that copy; admission refuses
 insufficient space. These are candidate requirements, not current live-test claims.
 
