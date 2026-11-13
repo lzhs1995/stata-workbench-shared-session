@@ -103,6 +103,87 @@ class SetupTests(unittest.TestCase):
             self.assertEqual(stat.S_IMODE(self.receipt.stat().st_mode), 0o700)
             self.assertEqual(stat.S_IMODE(Path(result["verifiedCopy"]).stat().st_mode), 0o400)
 
+    def test_custom_target_is_durable_before_install_and_identical_for_locate(self):
+        extensions = self.root / "Extensions 中文 O'Brien"
+        extensions.mkdir()
+        self.installed = self.installed.rename(extensions / setup.EXTENSION_ID)
+        user_data = self.root / "User data 中文 O'Brien"
+        target = {"userDataDir": str(user_data), "extensionsDir": str(extensions), "profile": "Research 中文 O'Brien"}
+        selectors = ["--user-data-dir", str(user_data), "--extensions-dir", str(extensions),
+                     "--profile", target["profile"]]
+        calls = []
+        before_environment = dict(os.environ)
+
+        def run(argv, **kwargs):
+            intent = json.loads((self.receipt / "intent.json").read_bytes())
+            self.assertEqual(intent["target"], target)
+            self.assertEqual(argv[1:7], selectors)
+            self.assertEqual(intent["cliArgv"], [str(self.root / "code"), *selectors])
+            self.assertIs(kwargs["shell"], False)
+            calls.append(argv)
+            return completed(stdout=b"installed" if "--install-extension" in argv else str(self.installed).encode())
+
+        result = self.install(run, user_data_dir=user_data, extensions_dir=extensions, profile=target["profile"])
+        self.assertEqual(result["state"], "installed-files-verified")
+        self.assertEqual(result["target"], target)
+        self.assertEqual(calls, [result["installerArgv"], result["locatorArgv"]])
+        self.assertEqual(dict(os.environ), before_environment)
+        self.assertFalse(user_data.exists())  # Only Code, not the helper, may create the target.
+
+    def test_each_target_selector_is_optional_and_defaults_add_no_arguments(self):
+        cases = ({}, {"user_data_dir": self.root / "user data"},
+                 {"extensions_dir": self.root}, {"profile": "Named profile"})
+        for index, options in enumerate(cases):
+            with self.subTest(options=options):
+                result = self.install(self.successful_runner(), receipt=self.root / str(index), **options)
+                self.assertEqual(result["state"], "installed-files-verified")
+                for key, option in (("user_data_dir", "--user-data-dir"), ("extensions_dir", "--extensions-dir"),
+                                    ("profile", "--profile")):
+                    self.assertEqual(option in result["installerArgv"], key in options)
+                    self.assertEqual(option in result["locatorArgv"], key in options)
+                if not options:
+                    self.assertEqual(result["cliArgv"], [str(self.root / "code")])
+                    self.assertEqual(result["target"], {"userDataDir": None, "extensionsDir": None, "profile": None})
+
+    def test_invalid_targets_refuse_before_receipt_or_subprocess(self):
+        invalid = [{key: value} for key in ("user_data_dir", "extensions_dir")
+                   for value in ("", "relative/path", "~/path", "/absolute\npath", self.file)]
+        invalid += [{"profile": value} for value in ("", " \t ", "--install-extension", "bad\nprofile")]
+        for options in invalid:
+            with self.subTest(options=options):
+                run = Mock()
+                with self.assertRaises(ValueError):
+                    self.install(run, **options)
+                run.assert_not_called()
+                self.assertFalse(self.receipt.exists())
+
+    def test_windows_target_paths_require_drive_or_unc_absolute_paths(self):
+        user_data = r"C:\Users\Example\.stata-workbench\user-data\default"
+        extensions = r"C:\Users\Example\.stata-workbench\extensions\default"
+        target, selectors = setup.installation_target(user_data, extensions, "Research profile", platform="win32")
+        self.assertEqual(target, {"userDataDir": user_data, "extensionsDir": extensions, "profile": "Research profile"})
+        self.assertEqual(selectors, ["--user-data-dir", user_data, "--extensions-dir", extensions,
+                                     "--profile", "Research profile"])
+        unc = r"\\server\share\extensions"
+        self.assertEqual(setup.installation_target(extensions_dir=unc, platform="win32")[0]["extensionsDir"], unc)
+        for invalid in ("", r"C:relative", r"\rooted-without-drive", "relative", "/posix/path"):
+            with self.subTest(value=invalid), self.assertRaisesRegex(ValueError, "absolute directory"):
+                setup.installation_target(user_data_dir=invalid, platform="win32")
+
+    def test_explicit_extensions_directory_rejects_other_valid_installation(self):
+        extensions = self.root / "chosen extensions"
+        result = self.install(self.successful_runner(), extensions_dir=extensions)
+        self.assertEqual(result["state"], "verification-incomplete")
+        self.assertEqual(result["error"], "INSTALLED_EXTENSION_TARGET_MISMATCH")
+        self.assertEqual(result["failedStage"], "locator")
+        before = self.receipt_bytes()
+        run = Mock(return_value=completed(stdout=str(self.installed).encode()))
+        result = setup.reconcile(self.receipt, run, platform="darwin")
+        self.assertEqual(result["state"], "verification-incomplete")
+        self.assertEqual(result["error"], "INSTALLED_EXTENSION_TARGET_MISMATCH")
+        self.assertEqual(self.receipt_bytes(), before)
+        run.assert_called_once()
+
     def test_manifest_changes_with_same_id_and_version_are_rejected(self):
         original = json.loads(self.members["package.json"])
         changes = {"main": "./wrong.js", "activationEvents": [],
@@ -358,6 +439,64 @@ class SetupTests(unittest.TestCase):
         self.assertNotIn("--install-extension", run.call_args.args[0])
         self.assertEqual(self.receipt_bytes(), before)
 
+    def test_custom_target_unknown_reconciles_original_target_once_without_install(self):
+        original = self.install(Mock(side_effect=subprocess.TimeoutExpired(["mock"], 120, output=b"partial")),
+                                user_data_dir=self.root / "original user data", extensions_dir=self.root,
+                                profile="Original profile")
+        before = self.receipt_bytes()
+        run = Mock(return_value=completed(stdout=str(self.installed).encode()))
+        result = setup.reconcile(self.receipt, run, platform="darwin")
+        self.assertEqual(result["state"], "reconciled-files-verified")
+        self.assertEqual(result["originalState"], "install-outcome-unknown")
+        self.assertEqual(result["target"], original["target"])
+        self.assertFalse(result["installationAttempted"])
+        self.assertFalse(result["originalOutcomeChanged"])
+        run.assert_called_once()
+        self.assertEqual(run.call_args.args[0], original["locatorArgv"])
+        self.assertNotIn("--install-extension", run.call_args.args[0])
+        self.assertEqual(self.receipt_bytes(), before)
+
+    def test_reconciliation_rejects_selector_and_installer_drift_before_locate(self):
+        self.install(self.successful_runner(), user_data_dir=self.root / "original", extensions_dir=self.root,
+                     profile="Original profile")
+        intent_path = self.receipt / "intent.json"
+        original = json.loads(intent_path.read_bytes())
+        changes = [{"target": {**original["target"], key: value}} for key, value in (
+            ("userDataDir", str(self.root / "different")), ("extensionsDir", str(self.root / "different")),
+            ("profile", "Different profile"))]
+        changes += [{"target": None}, {"target": {}}, {"target": {**original["target"], "extra": "ignored?"}},
+                    {"installerArgv": original["installerArgv"][:-1]},
+                    {"locatorArgv": [str(self.root / "code"), "--locate-extension", setup.EXTENSION_ID]}]
+        for change in changes:
+            with self.subTest(change=change):
+                intent_path.write_text(json.dumps({**original, **change}), encoding="utf-8")
+                run = Mock()
+                result = setup.reconcile(self.receipt, run, platform="darwin")
+                self.assertEqual(result["state"], "verification-incomplete")
+                self.assertIn("BINDING_MISMATCH", result["error"])
+                run.assert_not_called()
+        without_target = {key: value for key, value in original.items() if key != "target"}
+        intent_path.write_text(json.dumps(without_target), encoding="utf-8")
+        run = Mock()
+        result = setup.reconcile(self.receipt, run, platform="darwin")
+        self.assertIn("BINDING_MISMATCH", result["error"])
+        run.assert_not_called()
+
+    def test_legacy_default_receipt_still_reconciles_without_adding_selectors(self):
+        self.install(Mock(side_effect=subprocess.TimeoutExpired(["mock"], 120)))
+        intent_path = self.receipt / "intent.json"
+        intent = json.loads(intent_path.read_bytes())
+        del intent["target"]
+        intent_path.write_text(json.dumps(intent), encoding="utf-8")
+        before = self.receipt_bytes()
+        run = Mock(return_value=completed(stdout=str(self.installed).encode()))
+        result = setup.reconcile(self.receipt, run, platform="darwin")
+        self.assertEqual(result["state"], "reconciled-files-verified")
+        self.assertEqual(result["originalState"], "install-outcome-unknown")
+        run.assert_called_once()
+        self.assertEqual(run.call_args.args[0], intent["locatorArgv"])
+        self.assertEqual(self.receipt_bytes(), before)
+
     def test_reconciliation_without_original_result_keeps_outcome_unknown(self):
         self.install(self.successful_runner())
         (self.receipt / "result.json").unlink()  # Synthetic process-exit receipt.
@@ -409,12 +548,40 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(json.loads(output.getvalue()), result)
 
     def test_reconcile_cli_rejects_target_override(self):
-        with patch.object(sys, "argv", ["workbench_setup.py", "--reconcile-receipt", str(self.receipt), "--code", "/different"]), \
-                patch.object(setup, "reconcile") as reconcile, contextlib.redirect_stderr(io.StringIO()):
-            with self.assertRaises(SystemExit) as error:
-                setup.main()
-        self.assertEqual(error.exception.code, 2)
-        reconcile.assert_not_called()
+        for option, value in (("--code", "/different"), ("--user-data-dir", str(self.root)),
+                              ("--extensions-dir", str(self.root)), ("--profile", "Other"), ("--profile", ""),
+                              ("--user-data-dir", ""), ("--extensions-dir", "")):
+            with self.subTest(option=option, value=value), \
+                    patch.object(sys, "argv", ["workbench_setup.py", "--reconcile-receipt", str(self.receipt), option, value]), \
+                    patch.object(setup, "reconcile") as reconcile, contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as error:
+                    setup.main()
+            self.assertEqual(error.exception.code, 2)
+            reconcile.assert_not_called()
+
+    def test_install_cli_passes_exact_selectors_to_install(self):
+        user_data = str(self.root / "user data")
+        result = {"state": "installed-files-verified"}
+        argv = ["workbench_setup.py", "--code", "/Code", "--vsix", str(self.file), "--sha256", self.digest,
+                "--receipt", str(self.receipt), "--user-data-dir", user_data, "--extensions-dir", str(self.root),
+                "--profile", "Research profile"]
+        with patch.object(sys, "argv", argv), patch.object(setup, "install", return_value=result) as install, \
+                patch.object(setup, "inspect_runtime") as inspect, contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(setup.main(), 0)
+        install.assert_called_once_with(self.file, self.digest, "/Code", self.receipt,
+                                        user_data_dir=user_data, extensions_dir=str(self.root), profile="Research profile")
+        inspect.assert_not_called()
+
+    def test_invalid_cli_target_does_not_probe_runtime_or_install(self):
+        for option, value in (("--user-data-dir", "relative"), ("--extensions-dir", ""), ("--profile", " ")):
+            with self.subTest(option=option), patch.object(sys, "argv", ["workbench_setup.py", option, value]), \
+                    patch.object(setup, "install") as install, patch.object(setup, "inspect_runtime") as inspect, \
+                    contextlib.redirect_stderr(io.StringIO()):
+                with self.assertRaises(SystemExit) as error:
+                    setup.main()
+            self.assertEqual(error.exception.code, 2)
+            install.assert_not_called()
+            inspect.assert_not_called()
 
     def test_runtime_metadata_probe_does_not_import_stata(self):
         python = self.root / "bin/python3"

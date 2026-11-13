@@ -5,7 +5,7 @@ import hashlib
 import io
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath, PureWindowsPath
 import re
 import shutil
 import subprocess
@@ -152,6 +152,37 @@ def code_cli_command(code, platform=None):
     return [str(executable), str(cli)], {"ELECTRON_RUN_AS_NODE": "1", "VSCODE_DEV": ""}
 
 
+def installation_target(user_data_dir=None, extensions_dir=None, profile=None, *, platform=None):
+    """Validate explicit CLI selectors without creating or changing a profile."""
+    platform = sys.platform if platform is None else platform
+    path_type = PureWindowsPath if platform == "win32" else PurePosixPath
+    target, selectors = {}, []
+    for key, option, value in (("userDataDir", "--user-data-dir", user_data_dir),
+                               ("extensionsDir", "--extensions-dir", extensions_dir)):
+        if value is not None:
+            value = os.fspath(value)
+            if (not isinstance(value, str) or not value or any(ord(c) < 32 for c in value) or
+                    not path_type(value).is_absolute()):
+                raise ValueError(option + " must be an absolute directory")
+            if platform == sys.platform:
+                directory = Path(value).resolve()
+                if directory.exists() and not directory.is_dir():
+                    raise ValueError(option + " must be a directory")
+                value = str(directory)
+            else:
+                # Cross-platform validation is used by offline tests only.
+                value = str(path_type(value))
+            selectors.extend([option, value])
+        target[key] = value
+    if profile is not None:
+        if (not isinstance(profile, str) or not profile.strip() or profile.startswith("-") or
+                any(ord(c) < 32 for c in profile)):
+            raise ValueError("--profile must be a nonempty profile name, not an option")
+        selectors.extend(["--profile", profile])
+    target["profile"] = profile
+    return target, selectors
+
+
 def _write_once(path, data):
     """Exclusive, flushed receipt writes; never replace an earlier attempt."""
     with os.fdopen(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), "wb") as stream:
@@ -203,11 +234,18 @@ def verify_installed(extension, verified):
             "agentCommand": [sys.executable, str(extension / "tools/workbench_agent.py")]}
 
 
-def _located_path(completed):
+def _located_path(completed, extensions_dir=None):
     output = _output_bytes(completed.stdout).decode("utf-8").strip()
     extension = Path(output)
     if completed.returncode or not extension.is_absolute() or not extension.is_dir():
         raise ValueError("INSTALLED_EXTENSION_PATH_UNAVAILABLE")
+    if extensions_dir is not None:
+        try:
+            relative = extension.resolve().relative_to(Path(extensions_dir).resolve())
+        except ValueError:
+            raise ValueError("INSTALLED_EXTENSION_TARGET_MISMATCH") from None
+        if not relative.parts:
+            raise ValueError("INSTALLED_EXTENSION_TARGET_MISMATCH")
     return extension
 
 
@@ -216,11 +254,14 @@ def _run_cli(run, argv, environment, timeout):
                stdin=subprocess.DEVNULL, shell=False)
 
 
-def install(file, expected_sha, code, receipt, run=subprocess.run, *, platform=None):
+def install(file, expected_sha, code, receipt, run=subprocess.run, *, platform=None,
+            user_data_dir=None, extensions_dir=None, profile=None):
     platform = sys.platform if platform is None else platform
+    target, selectors = installation_target(user_data_dir, extensions_dir, profile, platform=platform)
     file = Path(file).resolve(strict=True)
     verified = verify_vsix(file, expected_sha)
     command, overrides = code_cli_command(code, platform)
+    command += selectors
     receipt = Path(receipt).expanduser().resolve()
     receipt.mkdir(parents=True, mode=0o700, exist_ok=False)
     copy = receipt / COPY_NAME
@@ -231,7 +272,7 @@ def install(file, expected_sha, code, receipt, run=subprocess.run, *, platform=N
     result = {"schema": RECEIPT_SCHEMA, "state": "install-requested", "vsix": str(file), "sha256": expected_sha,
               "verifiedCopy": str(copy), "verifiedBytes": len(verified["bytes"]), "platform": platform,
               "code": str(Path(code).expanduser().resolve()), "cliArgv": command, "installerArgv": installer,
-              "locatorArgv": locator, "environmentOverrides": overrides, "automaticRetries": 0,
+              "locatorArgv": locator, "target": target, "environmentOverrides": overrides, "automaticRetries": 0,
               "extensionId": EXTENSION_ID, "version": VERSION, "activated": False}
     _write_json(receipt / "intent.json", result)
     environment = {**os.environ, **overrides}
@@ -246,7 +287,7 @@ def install(file, expected_sha, code, receipt, run=subprocess.run, *, platform=N
             located = _run_cli(run, locator, environment, 30)
             result["locatorReturnCode"] = located.returncode
             result["outputErrors"].extend(_save_output(receipt, "locator", located))
-            extension = _located_path(located)
+            extension = _located_path(located, target["extensionsDir"])
             result["extensionPath"] = str(extension)
             stage = "file-verification"
             result.update(verify_installed(extension, verified))
@@ -288,18 +329,28 @@ def reconcile(receipt, run=subprocess.run, *, platform=None):
             raise ValueError("ORIGINAL_RECEIPT_COPY_BINDING_MISMATCH")
         verified = verify_vsix(copy, intent["sha256"])
         command, overrides = code_cli_command(intent["code"], platform)
+        # Receipts created before explicit target support used the default CLI
+        # target. Their original argv must still match; never add selectors.
+        saved_target = intent.get("target", {"userDataDir": None, "extensionsDir": None, "profile": None})
+        if not isinstance(saved_target, dict) or set(saved_target) != {"userDataDir", "extensionsDir", "profile"}:
+            raise ValueError("ORIGINAL_RECEIPT_TARGET_BINDING_MISMATCH")
+        target, selectors = installation_target(saved_target["userDataDir"], saved_target["extensionsDir"],
+                                                saved_target["profile"], platform=platform)
+        command += selectors
         locator = command + ["--locate-extension", EXTENSION_ID]
-        if (intent.get("cliArgv") != command or intent.get("environmentOverrides") != overrides or
+        installer = command + ["--install-extension", str(copy), "--force"]
+        if (saved_target != target or intent.get("cliArgv") != command or
+                intent.get("installerArgv") != installer or intent.get("environmentOverrides") != overrides or
                 intent.get("locatorArgv") != locator or intent.get("extensionId") != EXTENSION_ID or
                 intent.get("version") != VERSION or intent.get("verifiedBytes") != len(verified["bytes"])):
             raise ValueError("ORIGINAL_RECEIPT_TARGET_BINDING_MISMATCH")
-        result.update(sha256=intent["sha256"], locatorArgv=locator, environmentOverrides=overrides)
+        result.update(sha256=intent["sha256"], locatorArgv=locator, target=target, environmentOverrides=overrides)
         stage = "locator"
         located = _run_cli(run, locator, {**os.environ, **overrides}, 30)
         result.update(locatorReturnCode=located.returncode,
                       locatorStdout=_output_bytes(located.stdout).decode("utf-8", errors="replace"),
                       locatorStderr=_output_bytes(located.stderr).decode("utf-8", errors="replace"))
-        extension = _located_path(located)
+        extension = _located_path(located, target["extensionsDir"])
         stage = "file-verification"
         observed = verify_installed(extension, verified)
         result.update(observed)
@@ -315,6 +366,9 @@ def reconcile(receipt, run=subprocess.run, *, platform=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--code")
+    parser.add_argument("--user-data-dir", help="absolute user-data directory for the exact Code target")
+    parser.add_argument("--extensions-dir", help="absolute extensions directory for the exact Code target")
+    parser.add_argument("--profile", help="named profile within the selected Code user-data directory")
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--vsix", type=Path)
     mode.add_argument("--reconcile-receipt", type=Path,
@@ -323,21 +377,28 @@ def main():
     parser.add_argument("--receipt", type=Path)
     args = parser.parse_args()
     if args.reconcile_receipt:
-        if args.code or args.sha256 or args.receipt:
+        if any(value is not None for value in (args.code, args.sha256, args.receipt,
+                                               args.user_data_dir, args.extensions_dir, args.profile)):
             parser.error("reconciliation uses only the original receipt's target")
         result = reconcile(args.reconcile_receipt)
         print(json.dumps(result, ensure_ascii=False))
         return 0 if result["state"] == "reconciled-files-verified" else 2
+    try:
+        target, _ = installation_target(args.user_data_dir, args.extensions_dir, args.profile)
+    except (TypeError, ValueError) as exc:
+        parser.error(str(exc))
     args.code = args.code or host.default_code()
     if args.vsix:
         if not args.sha256 or not args.receipt:
             parser.error("installation requires --sha256 and a new --receipt directory")
-        result = install(args.vsix, args.sha256, args.code, args.receipt)
+        result = install(args.vsix, args.sha256, args.code, args.receipt,
+                         user_data_dir=target["userDataDir"], extensions_dir=target["extensionsDir"],
+                         profile=target["profile"])
         print(json.dumps(result, ensure_ascii=False))
         return 0 if result["state"] == "installed-files-verified" else 2
     if args.sha256 or args.receipt:
         parser.error("--sha256 and --receipt require --vsix")
-    result = {"platform": sys.platform, "code": args.code, "runtime": inspect_runtime(runtime_root()),
+    result = {"platform": sys.platform, "code": args.code, "target": target, "runtime": inspect_runtime(runtime_root()),
               "freeBytes": shutil.disk_usage(Path.home()).free,
               "stateRoot": str(Path(os.environ.get("STATA_WORKBENCH_HOME", str(Path.home() / ".stata-workbench")))),
               "liveSessionStarted": False}
