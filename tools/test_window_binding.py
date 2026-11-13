@@ -13,12 +13,14 @@ from test_shared_stata import state as legacy_state
 
 class WindowBindingTests(unittest.TestCase):
     def setUp(self):
+        self.extension = (Path(tempfile.gettempdir()) / "installed").resolve()
+        self.profile = (Path(tempfile.gettempdir()) / "session-A").resolve()
         self.rec = {"ordinaryWindow": True, "sessionId": "w-A", "sessionName": "stata-A", "port": 19001,
-                    "extensionHostPid": 1234, "startedAt": "same-host", "profilePath": "/tmp/session-A",
-                    "extensionPath": "/tmp/installed"}
+                    "extensionHostPid": 1234, "startedAt": "same-host", "profilePath": str(self.profile),
+                    "extensionPath": str(self.extension)}
         self.status = {"extensionHostPid": 1234, "extensionVersion": entry.VERSION,
                        "diskBundleSha256": entry.BUNDLE_SHA256, "bundleIdentityState": "OK",
-                       "guardModuleIdentityState": "OK", "bundleId": "/tmp/installed",
+                       "guardModuleIdentityState": "OK", "bundleId": str(self.extension),
                        "windowSession": {"sessionId": "w-A"}, "nextSession": {"sessionId": "w-A"},
                        "terminalWebview": {"panelExists": True, "scriptReady": True},
                        "busy": False, "postRunBusy": False, "trueReady": True,
@@ -27,7 +29,7 @@ class WindowBindingTests(unittest.TestCase):
     def observe(self, status=None, listeners=None):
         status = self.status if status is None else status
         with patch.object(entry, "verify_session_identity", return_value={"sessionId": "w-A"}), \
-                patch.object(entry, "EXTENSION", Path("/tmp/installed")):
+                patch.object(entry, "EXTENSION", self.extension):
             return entry.observe_window_session(SimpleNamespace(w=SimpleNamespace(status=lambda timeout: status)), self.rec,
                                                 listeners or (lambda port: {1234}))
 
@@ -109,8 +111,8 @@ class WindowBindingTests(unittest.TestCase):
                 patch.object(entry, "EXTENSION"), patch.object(entry, "PROFILE"), \
                 patch.object(entry, "PORT"), patch.object(entry, "BOUND_SESSION_ID"):
             entry.bind_session("w-A")
-            self.assertEqual(entry.EXTENSION, Path("/tmp/installed").resolve())
-            self.assertEqual(entry.PROFILE, Path("/tmp/session-A").resolve())
+            self.assertEqual(entry.EXTENSION, self.extension)
+            self.assertEqual(entry.PROFILE, self.profile)
             self.assertEqual(entry.PORT, 19001)
             self.assertEqual(entry.BOUND_SESSION_ID, "w-A")
 
