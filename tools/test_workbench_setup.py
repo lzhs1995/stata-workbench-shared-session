@@ -49,9 +49,26 @@ class SetupTests(unittest.TestCase):
                 archive.writestr("extension/" + name, content)
         return output.getvalue()
 
+    @contextlib.contextmanager
+    def platform_rules(self, platform=None):
+        """Default tests simulate the plain non-Windows launcher; real temporary paths keep host path rules."""
+        if platform is not None:
+            yield platform
+        elif sys.platform != "win32":
+            yield "darwin"
+        else:
+            plain = lambda code, platform=None: (setup.host.code_launch_command(code, "darwin"), {})
+            with patch.object(setup, "code_cli_command", side_effect=plain):
+                yield sys.platform
+
     def install(self, run, **kwargs):
-        return setup.install(self.file, self.digest, kwargs.pop("code", self.root / "code"),
-                             kwargs.pop("receipt", self.receipt), run, platform=kwargs.pop("platform", "darwin"), **kwargs)
+        with self.platform_rules(kwargs.pop("platform", None)) as platform:
+            return setup.install(self.file, self.digest, kwargs.pop("code", self.root / "code"),
+                                 kwargs.pop("receipt", self.receipt), run, platform=platform, **kwargs)
+
+    def reconcile(self, run):
+        with self.platform_rules() as platform:
+            return setup.reconcile(self.receipt, run, platform=platform)
 
     def successful_runner(self):
         return Mock(side_effect=[completed(stdout=b"installed"), completed(stdout=str(self.installed).encode())])
@@ -178,7 +195,7 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(result["failedStage"], "locator")
         before = self.receipt_bytes()
         run = Mock(return_value=completed(stdout=str(self.installed).encode()))
-        result = setup.reconcile(self.receipt, run, platform="darwin")
+        result = self.reconcile(run)
         self.assertEqual(result["state"], "verification-incomplete")
         self.assertEqual(result["error"], "INSTALLED_EXTENSION_TARGET_MISMATCH")
         self.assertEqual(self.receipt_bytes(), before)
@@ -428,7 +445,7 @@ class SetupTests(unittest.TestCase):
         self.install(Mock(side_effect=subprocess.TimeoutExpired(["mock"], 120, output=b"partial")))
         before = self.receipt_bytes()
         run = Mock(return_value=completed(stdout=str(self.installed).encode()))
-        result = setup.reconcile(self.receipt, run, platform="darwin")
+        result = self.reconcile(run)
         self.assertEqual(result["state"], "reconciled-files-verified")
         self.assertEqual(result["originalState"], "install-outcome-unknown")
         self.assertFalse(result["originalOutcomeChanged"])
@@ -445,7 +462,7 @@ class SetupTests(unittest.TestCase):
                                 profile="Original profile")
         before = self.receipt_bytes()
         run = Mock(return_value=completed(stdout=str(self.installed).encode()))
-        result = setup.reconcile(self.receipt, run, platform="darwin")
+        result = self.reconcile(run)
         self.assertEqual(result["state"], "reconciled-files-verified")
         self.assertEqual(result["originalState"], "install-outcome-unknown")
         self.assertEqual(result["target"], original["target"])
@@ -471,14 +488,14 @@ class SetupTests(unittest.TestCase):
             with self.subTest(change=change):
                 intent_path.write_text(json.dumps({**original, **change}), encoding="utf-8")
                 run = Mock()
-                result = setup.reconcile(self.receipt, run, platform="darwin")
+                result = self.reconcile(run)
                 self.assertEqual(result["state"], "verification-incomplete")
                 self.assertIn("BINDING_MISMATCH", result["error"])
                 run.assert_not_called()
         without_target = {key: value for key, value in original.items() if key != "target"}
         intent_path.write_text(json.dumps(without_target), encoding="utf-8")
         run = Mock()
-        result = setup.reconcile(self.receipt, run, platform="darwin")
+        result = self.reconcile(run)
         self.assertIn("BINDING_MISMATCH", result["error"])
         run.assert_not_called()
 
@@ -490,7 +507,7 @@ class SetupTests(unittest.TestCase):
         intent_path.write_text(json.dumps(intent), encoding="utf-8")
         before = self.receipt_bytes()
         run = Mock(return_value=completed(stdout=str(self.installed).encode()))
-        result = setup.reconcile(self.receipt, run, platform="darwin")
+        result = self.reconcile(run)
         self.assertEqual(result["state"], "reconciled-files-verified")
         self.assertEqual(result["originalState"], "install-outcome-unknown")
         run.assert_called_once()
@@ -500,7 +517,7 @@ class SetupTests(unittest.TestCase):
     def test_reconciliation_without_original_result_keeps_outcome_unknown(self):
         self.install(self.successful_runner())
         (self.receipt / "result.json").unlink()  # Synthetic process-exit receipt.
-        result = setup.reconcile(self.receipt, Mock(return_value=completed(stdout=str(self.installed).encode())), platform="darwin")
+        result = self.reconcile(Mock(return_value=completed(stdout=str(self.installed).encode())))
         self.assertEqual(result["originalState"], "install-outcome-unknown")
         self.assertEqual(result["state"], "reconciled-files-verified")
         self.assertFalse((self.receipt / "result.json").exists())
@@ -511,7 +528,7 @@ class SetupTests(unittest.TestCase):
         original = json.loads(intent_path.read_bytes())
         intent_path.write_text(json.dumps({**original, "cliArgv": ["different"]}), encoding="utf-8")
         run = Mock()
-        result = setup.reconcile(self.receipt, run, platform="darwin")
+        result = self.reconcile(run)
         self.assertEqual(result["state"], "verification-incomplete")
         self.assertIn("BINDING_MISMATCH", result["error"])
         run.assert_not_called()
@@ -519,7 +536,7 @@ class SetupTests(unittest.TestCase):
         candidate = self.receipt / setup.COPY_NAME
         candidate.chmod(0o600)
         candidate.write_bytes(b"changed")
-        result = setup.reconcile(self.receipt, run, platform="darwin")
+        result = self.reconcile(run)
         self.assertEqual(result["state"], "verification-incomplete")
         self.assertEqual(result["error"], "VSIX_SHA_MISMATCH")
         run.assert_not_called()
@@ -528,7 +545,7 @@ class SetupTests(unittest.TestCase):
         self.install(self.successful_runner())
         before = self.receipt_bytes()
         run = Mock(side_effect=subprocess.TimeoutExpired(["mock"], 30, output=b"partial", stderr=b"error"))
-        result = setup.reconcile(self.receipt, run, platform="darwin")
+        result = self.reconcile(run)
         self.assertEqual(result["state"], "verification-incomplete")
         self.assertEqual(result["originalState"], "installed-files-verified")
         self.assertEqual(result["locatorStdout"], "partial")
