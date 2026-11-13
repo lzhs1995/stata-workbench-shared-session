@@ -291,7 +291,9 @@ def continue_workflow(directory, destination, file, user_action, bridge=None, sp
     return launch_worker(child, spawn)
 
 
-def propose_edit(directory, content, reason, bridge=None):
+def propose_edit(directory, content, reason, bridge=None, review_timeout=120):
+    if type(review_timeout) is not int or not 1 <= review_timeout <= 900:
+        raise ValueError("review timeout must be an integer from 1 to 900 seconds")
     directory, workflow = load_workflow(directory)
     if bridge is None:
         bind(workflow["identity"]["sessionId"], workflow["stateRoot"])
@@ -308,7 +310,7 @@ def propose_edit(directory, content, reason, bridge=None):
     proposal_id = "edit_" + uuid.uuid4().hex
     request = {"proposalId": proposal_id, "sessionId": ident["sessionId"], "generation": ident["generation"],
         "path": workflow["sourcePath"], "expectedSha256": doc["sha256"], "documentVersion": doc["documentVersion"],
-        "content": content, "reason": reason, "agentName": workflow["agentName"]}
+        "content": content, "reason": reason, "agentName": workflow["agentName"], "timeoutMs": review_timeout * 1000}
     proposal_dir = directory / "proposals" / proposal_id
     proposal_dir.mkdir(parents=True, mode=0o700)
     write(proposal_dir / "request.json", request)
@@ -342,6 +344,8 @@ def main(argv=None):
         if name == "propose-edit":
             command.add_argument("--content-file", type=Path, help="omit to read proposed bytes from stdin")
             command.add_argument("--reason", required=True)
+            command.add_argument("--review-timeout", type=int, default=120,
+                help="human review time in whole seconds, 1 through 900 (default: 120)")
         if name == "reconcile":
             command.add_argument("--proposal-id")
     args = parser.parse_args(argv)
@@ -373,8 +377,10 @@ def main(argv=None):
     elif args.command == "continue":
         output = continue_workflow(args.workflow, args.workflow_dir, args.file, args.user_action)
     elif args.command == "propose-edit":
+        if not 1 <= args.review_timeout <= 900:
+            parser.error("--review-timeout must be an integer from 1 to 900 seconds")
         content = args.content_file.read_text(encoding="utf-8") if args.content_file else sys.stdin.read()
-        output = propose_edit(args.workflow, content, args.reason)
+        output = propose_edit(args.workflow, content, args.reason, review_timeout=args.review_timeout)
     else:
         if args.proposal_id:
             if not ID.fullmatch(args.proposal_id):

@@ -118,7 +118,7 @@ To propose a change, supply proposed text on stdin or a separate proposal file;
 **do not overwrite the target .do first**:
 
 ```sh
-python3 "$WB_AGENT" propose-edit --workflow /abs/receipts/stage01 --content-file /abs/proposals/stage01-proposed.txt --reason 'Apply the requested model change'
+python3 "$WB_AGENT" propose-edit --workflow /abs/receipts/stage01 --content-file /abs/proposals/stage01-proposed.txt --reason 'Apply the requested model change' --review-timeout 900
 python3 "$WB_AGENT" reconcile --workflow /abs/receipts/stage01 --proposal-id RETURNED_PROPOSAL_ID
 ```
 
@@ -129,7 +129,12 @@ Accept or Reject. If they instead edit the original buffer, save it and submit
 a new proposal; dirty/version/SHA conflicts invalidate the old one. The gate
 also checks workspace realpaths and session generation, retains an original
 snapshot, and serializes final checks and writes per target. Proposals expire
-after two minutes by default; clicking an old Accept afterward has no effect.
+after two minutes by default. Optional `--review-timeout` accepts whole seconds
+from 1 through 900; the example allows fifteen minutes for human review. Its
+duration is fixed in the original proposal request, not renewed by polling.
+Clicking an old Accept after expiry has no effect. To propose again after a
+confirmed expiry, create a fresh proposal; never resend an unknown original
+request or reuse its ID to extend its deadline.
 A duplicate proposal ID with identical bytes returns its original state;
 different bytes under that ID are refused. If the submit response is lost,
 query the returned durable ID from the workflow's `proposals/` directory.

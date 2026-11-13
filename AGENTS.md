@@ -95,6 +95,11 @@ acceptance. Preserve the person's edits, let them save, then propose again.
 Never use direct Edit/Write/apply_patch or shell redirection on the target to
 bypass the gate. This host rule is not an OS write sandbox.
 
+The review window defaults to 120 seconds. Add `--review-timeout 900` when the
+person needs fifteen minutes; accepted values are whole seconds from 1 to 900.
+The original request records that duration. Polling never extends expiry, and
+an unknown submission must still be queried by its original proposal ID.
+
 **Accept only writes the file. It never executes or authorizes continuation.**
 A fresh user continuation instruction must select the saved stage explicitly:
 

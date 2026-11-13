@@ -258,6 +258,41 @@ class WorkflowTests(unittest.TestCase):
         self.assertFalse((self.directory / "continue-intent.json").exists())
         self.assertFalse(any(c.args[0] == "/run-command" for c in self.bridge.request.call_args_list))
 
+    def test_proposal_cli_serializes_review_seconds_once_and_keeps_default(self):
+        self.bridge.status.return_value.update(busy=False, trueReady=True)
+        proposed = self.root / "proposed.txt"
+        proposed.write_text("display 2\n")
+        for extra, expected_ms in (([], 120000), (["--review-timeout", "900"], 900000)):
+            self.bridge.request.reset_mock()
+            with patch.object(agent, "bind"), patch.object(agent.entry, "LocalBridge", return_value=self.bridge), \
+                 patch("sys.stdout", io.StringIO()) as output:
+                agent.main(["propose-edit", "--workflow", str(self.directory), "--content-file", str(proposed),
+                    "--reason", "review the proposed change", *extra])
+            result = json.loads(output.getvalue())
+            saved = agent.read(self.directory / "proposals" / result["proposalId"] / "request.json")
+            calls = [c for c in self.bridge.request.call_args_list if c.args[0] == "/propose-edit"]
+            self.assertEqual(len(calls), 1)
+            self.assertEqual(json.loads(json.dumps(calls[0].args[1])), saved)
+            self.assertEqual(saved["timeoutMs"], expected_ms)
+            self.assertEqual(saved["proposalId"], result["proposalId"])
+            self.assertEqual(saved["path"], str(self.file))
+            self.assertEqual(self.file.read_text(), "display 1\n")
+            self.assertFalse(result["automaticRetry"])
+
+    def test_invalid_review_timeout_refused_before_input_or_bridge(self):
+        for value in ("0", "901", "-1", "1.5", "NaN", "Infinity", "True"):
+            with self.subTest(value=value), patch.object(agent, "propose_edit") as propose, \
+                 patch("sys.stdin") as stdin, patch("sys.stderr", io.StringIO()), self.assertRaises(SystemExit) as failure:
+                agent.main(["propose-edit", "--workflow", str(self.directory), "--reason", "review", "--review-timeout", value])
+            self.assertEqual(failure.exception.code, 2)
+            propose.assert_not_called()
+            stdin.read.assert_not_called()
+        for value in (0, 901, -1, 1.5, float("nan"), float("inf"), True):
+            with self.subTest(direct=value), self.assertRaisesRegex(ValueError, "integer from 1 to 900"):
+                agent.propose_edit(self.directory, "display 2\n", "review", self.bridge, review_timeout=value)
+        self.bridge.status.assert_not_called()
+        self.bridge.request.assert_not_called()
+
     def test_lost_proposal_response_retains_original_id_and_request_for_query(self):
         self.bridge.status.return_value.update(busy=False, trueReady=True)
         original = self.request
