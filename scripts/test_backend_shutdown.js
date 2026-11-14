@@ -89,13 +89,16 @@ function fixture({createGate,connectGate,listGate,closeGate}={}) {
   const bundle=fs.readFileSync(path.join(__dirname,"../dist/extension.js"),"utf8");
   const layer=historicalLayer(bundle,"./apply_backend_shutdown_patch");
   const original=patch.revertBundle(layer,{finalize:false});
+  // Existing layers retain their recorded implementation and inverse. A new
+  // source revision may change the route only after reverting and reapplying.
+  assert.equal(sha(patch.patchBundle(layer,{finalize:false})),sha(layer),"historical layer remains unchanged");
   const patched=patch.patchBundle(original,{finalize:false});
   new vm.Script(patched);
-  assert.equal(sha(patched),sha(layer),"replay restores the exact historical shutdown layer");
+  assert.ok(patched.includes(patch.CLOSE_ENDPOINT),"new replay installs the current close route");
   assert.equal(sha(patch.patchBundle(patched,{finalize:false})),sha(patched));
   assert.equal(sha(patch.revertBundle(patched,{finalize:false})),sha(original));
   assert.throws(()=>patch.patchBundle(original.replace('async function bHg(){','async function renamed(){'),{finalize:false}),/anchor/);
   assert.throws(()=>patch.patchBundle(original+'async function bHg(){',{finalize:false}),/anchor/);
-  count+=6;
+  count+=7;
   console.log(JSON.stringify({verdict:"PASS",groups:count,scope:"offline lifecycle/patch only",distWritten:false}));
 })().catch(error=>{console.error(error);process.exitCode=1;});

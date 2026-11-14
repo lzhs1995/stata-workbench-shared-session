@@ -5,7 +5,16 @@ const assert=require("node:assert/strict"),fs=require("node:fs"),path=require("n
 const {EventEmitter}=require("node:events");
 const {createLifecycle}=require("./backend_shutdown_core");
 const patch=require("./apply_backend_shutdown_patch");
+const {historicalLayer,between:extract}=require("./test_daily_bundle_helpers");
 const bundle=patch.patchBundle(fs.readFileSync(path.join(__dirname,"../dist/extension.js"),"utf8"),{finalize:false});
+// Rebuild just the shutdown layer in memory. An already sealed bundle keeps its
+// recorded route until the integration owner explicitly replays the layers.
+const shutdownLayer=historicalLayer(bundle,"./apply_backend_shutdown_patch");
+const currentLayer=patch.patchBundle(patch.revertBundle(shutdownLayer,{finalize:false}),{finalize:false});
+new vm.Script(currentLayer);
+const closeRoute=extract(currentLayer,'if(__req.method==="POST"&&String(__req.url||"").startsWith("/session-close?"))',
+  'if(zg.__codexLifecycle().status().closing)');
+assert.equal(closeRoute,patch.CLOSE_ENDPOINT);
 function between(a,b){const i=bundle.indexOf(a),j=bundle.indexOf(b,i+a.length);assert.ok(i>=0&&j>i);return bundle.slice(i,j);}
 const deferred=()=>{let resolve,reject;const promise=new Promise((a,b)=>{resolve=a;reject=b;});return {promise,resolve,reject};};
 const tick=async()=>{for(let i=0;i<40;i++)await Promise.resolve();};
@@ -18,7 +27,8 @@ function fixture(){
     EE:{workspace:{getConfiguration:()=>({get:(key,fallback)=>fallback})},CancellationTokenSource},
     CI:{startSpan:(_meta,fn)=>fn(),captureException(){}},MM:()=>({}),
     setTimeout,clearTimeout,process:{pid:42,platform:"win32"},RI(){},HF(){},Gg:{_postMessage(){}},
-    __current:()=>({nextSession:{sessionId:"A"},resetGeneration:0,diskBundleSha256:"bundle"}),
+    __current:()=>({nextSession:{sessionId:"A"},resetGeneration:0,diskBundleSha256:"bundle",
+      busy:false,trueReady:true,current:null,runId:null,recovery:{required:false,generation:0,activeRunId:null}}),
     __codexControl:{ensureRecoveryState:s=>s||{},requestRecovery:s=>s},__send:(_res,code,data)=>events.push({code,data}),
   };
   const context=vm.createContext(env);
@@ -144,20 +154,80 @@ function fixture(){
     await life.shutdown();count++;
   }
   {
-    const f=fixture(),gate=deferred();let closes=0;const callbacks=[];
+    const f=fixture(),gate=deferred();let closes=0,shutdownCalls=0;const callbacks=[];
     f.env.iA={commands:{executeCommand:async command=>{assert.equal(command,"workbench.action.closeWindow");closes++;}}};
     f.env.setTimeout=fn=>callbacks.push(fn);f.env.__req={method:"POST",url:"/session-close?sessionId=A&hostPid=42&generation=0&bundle=bundle"};f.env.__res={};
     const ownLife=createLifecycle(f.client,{manager:()=>({beginClose(){},finishClose:()=>gate.promise})});f.client.__codexLifecycle=()=>ownLife;
-    const endpoint=vm.runInContext('(async()=>{'+patch.CLOSE_ENDPOINT+'})',f.context);
+    const shutdown=ownLife.shutdown;ownLife.shutdown=(...args)=>{shutdownCalls++;return shutdown(...args);};
+    const endpoint=vm.runInContext('(async()=>{'+closeRoute+'})',f.context);
     const p=endpoint();await tick();assert.equal(closes,0);assert.equal(ownLife.status().closing,true);
     await endpoint();assert.equal(f.events.at(-1).data.error,"CLOSE_ALREADY_REQUESTED_NO_REPLAY");
+    assert.equal(f.events.at(-1).data.closeAdmission,undefined);
+    assert.equal(shutdownCalls,1,"duplicate close must not call shutdown a second time");
     gate.resolve({});await p;assert.equal(f.events.at(-1).data.backendCleanup,"complete");
     assert.equal(callbacks.length,1);await callbacks[0]();assert.equal(closes,1);count++;
   }
-  {
-    const f=fixture();f.env.__req={method:"POST",url:"/session-close?sessionId=B"};f.env.__res={};
-    await vm.runInContext('(async()=>{'+patch.CLOSE_ENDPOINT+'})()',f.context);
-    assert.equal(f.events.at(-1).code,409);assert.equal(f.life.status().closing,false);count++;
+  for(const [field,value] of [["sessionId","B"],["hostPid","43"],["generation","1"],["bundle","other-bundle"]]){
+    const f=fixture();let shutdownCalls=0;
+    const query=new URLSearchParams({sessionId:"A",hostPid:"42",generation:"0",bundle:"bundle"});query.set(field,value);
+    f.env.__req={method:"POST",url:"/session-close?"+query};f.env.__res={};
+    const shutdown=f.life.shutdown;f.life.shutdown=(...args)=>{shutdownCalls++;return shutdown(...args);};
+    await vm.runInContext('(async()=>{'+closeRoute+'})()',f.context);
+    assert.equal(f.events.at(-1).code,409);assert.equal(f.events.at(-1).data.error,"SESSION_IDENTITY_MISMATCH");
+    assert.equal(f.events.at(-1).data.closeAdmission,undefined);
+    assert.equal(f.life.status().closing,false);assert.equal(shutdownCalls,0);assert.equal(f.env.__codexWindowCloseRequested,undefined);count++;
+  }
+  // Execute the real close route against real lifecycle admission/fencing. Only
+  // current bridge state, time and the awaited cleanup boundary are injected.
+  for(const phase of ["pending-connect","active-smoke","completed-recovery","stale-top-level-run"]){
+    const f=fixture(),cleanup=deferred(),prepare=deferred(),callbacks=[];
+    let clock=1234.5,created=0,shutdownCalls=0;
+    const smoke=phase==="active-smoke",completed=phase==="completed-recovery",stale=phase==="stale-top-level-run";
+    const busy=smoke||stale,recoveryRequired=smoke||stale;
+    const currentRunId=smoke?"current-recovery-smoke":stale?"ordinary-current-run":null;
+    const activeRunId=smoke?"current-recovery-smoke":stale?"stale-completed-run":null;
+    const state={nextSession:{sessionId:"A"},resetGeneration:7,diskBundleSha256:"bundle",
+      busy,trueReady:completed,current:busy?{runId:currentRunId}:null,
+      runId:"stale-completed-run",recovery:{required:recoveryRequired,generation:3,
+        activeRunId,token:"snapshot-secret",marker:"snapshot-secret-marker"}};
+    f.env.__current=()=>state;
+    f.env.__codexRecoveryState={required:true,generation:99,activeRunId:"wrong-private-run",token:"private-secret"};
+    f.env.setTimeout=fn=>callbacks.push(fn);
+    f.env.__req={method:"POST",url:"/session-close?sessionId=A&hostPid=42&generation=7&bundle=bundle"};f.env.__res={};
+    const life=createLifecycle(f.client,{now:()=>clock,manager:()=>({beginClose(){},finishClose:()=>cleanup.promise})});
+    f.client.__codexLifecycle=()=>life;
+    await life.dispose();await life.dispose(); // epoch 2 is distinct from reset 7 and recovery 3.
+    f.client._createClient=async()=>{created++;throw Error("unexpected backend creation");};
+    let pending;
+    if(phase==="pending-connect"){
+      pending=life.ensureClient(()=>prepare.promise).catch(error=>error);await tick();
+      assert.equal(life.status().pendingAttempts,1);
+    }
+    f.client._active=!state.busy; // Transport activity is not the bridge busy flag.
+    const shutdown=life.shutdown;life.shutdown=(...args)=>{shutdownCalls++;return shutdown(...args);};
+    const endpoint=vm.runInContext('(async()=>{'+closeRoute+'})',f.context);
+    const before=Date.now(),closing=endpoint();
+    assert.equal(shutdownCalls,1,"snapshot must call the same lifecycle shutdown before yielding");
+    assert.equal(life.status().closing,true,"shutdown fence must be synchronous");
+    assert.equal(life.status().epoch,3);
+    assert.equal(f.events.some(e=>e&&e.code===200),false,"no success while cleanup is pending");
+    // Live state changes while shutdown awaits must not rewrite entry evidence.
+    state.resetGeneration=8;state.busy=!busy;state.trueReady=!completed;
+    if(state.current)state.current.runId="later-run";
+    state.recovery.required=!recoveryRequired;state.recovery.generation=4;state.recovery.activeRunId="later-smoke";clock=1400;
+    prepare.resolve();cleanup.resolve({});await closing;
+    if(pending)assert.match((await pending).message,/CLOSING/);
+    const response=f.events.find(e=>e&&e.code===200),admission=JSON.parse(JSON.stringify(response.data.closeAdmission));
+    assert.ok(Number.isFinite(Date.parse(admission.observedAtUtc)));
+    assert.ok(Date.parse(admission.observedAtUtc)>=before&&Date.parse(admission.observedAtUtc)<=Date.now());
+    assert.deepEqual(admission,{schema:"stata-close-admission/1",capturedBeforeShutdown:true,
+      sessionId:"A",extensionHostPid:42,generation:7,bundleSha256:"bundle",observedAtUtc:admission.observedAtUtc,
+      monotonicMs:1234.5,lifecycleEpoch:2,pendingAttempts:phase==="pending-connect"?1:0,
+      closing:false,trueReady:completed,busy,runId:currentRunId,
+      recovery:{required:recoveryRequired,generation:3,activeRunId}});
+    assert.equal(response.data.backendCleanup,"complete");assert.equal(response.data.shutdown.pendingAttempts,0);
+    assert.doesNotMatch(JSON.stringify(response.data),/snapshot-secret|private-secret|wrong-private-run|"token"|"marker"/);
+    assert.equal(created,0);assert.equal(shutdownCalls,1);assert.equal(callbacks.length,1);count++;
   }
   console.log(JSON.stringify({verdict:"PASS",groups:count,scope:"actual patched bundle methods; injected boundaries only"}));
 })().catch(e=>{console.error(e);process.exitCode=1;});
