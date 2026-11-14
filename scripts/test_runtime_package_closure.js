@@ -11,14 +11,14 @@ const root = path.resolve(__dirname, "..");
 const pkg = require(path.join(root, "package.json"));
 const vsix = process.argv[2] || path.join(root, `${pkg.name}-${pkg.version}.vsix`);
 assert.ok(path.isAbsolute(vsix), "Pass one absolute VSIX path");
-async function extractScripts(destination) {
+async function extractRuntime(destination) {
   await new Promise((resolve, reject) => {
     yauzl.open(vsix, { lazyEntries: true }, (error, zip) => {
       if (error) return reject(error);
       zip.on("error", reject);
       zip.on("entry", entry => {
         const name = entry.fileName;
-        if (!name.startsWith("extension/scripts/") || name.endsWith("/")) return zip.readEntry();
+        if ((!name.startsWith("extension/scripts/") && name !== "extension/dist/extension.js") || name.endsWith("/")) return zip.readEntry();
         assert.ok(!name.includes("\\") && !name.split("/").includes(".."), "Invalid member path");
         const output = path.join(destination, name);
         fs.mkdirSync(path.dirname(output), { recursive: true });
@@ -38,7 +38,21 @@ async function extractScripts(destination) {
 (async () => {
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "stata-vsix-runtime-"));
   try {
-    await extractScripts(temporary);
+    await extractRuntime(temporary);
+    const nativeEntry = path.join(temporary, "extension/scripts/native_close_evidence.js");
+    assert.deepEqual(fs.readFileSync(nativeEntry), fs.readFileSync(path.join(root, "scripts/native_close_evidence.js")),
+      "Packaged native admission helper must match the reviewed source bytes");
+    const bundle = fs.readFileSync(path.join(temporary, "extension/dist/extension.js"), "utf8");
+    const { DEACTIVATE } = require("./apply_backend_shutdown_patch");
+    const start = bundle.indexOf("async function bHg(){");
+    const end = bundle.indexOf("function HF(g){", start);
+    assert.ok(start >= 0 && end > start && bundle.indexOf("async function bHg(){", start + 1) < 0,
+      "Unique actual packaged deactivation entrypoint");
+    assert.equal(bundle.slice(start, end), DEACTIVATE, "Packaged native deactivation must use the current helper");
+    const nativeProbe = "const p=require(" + JSON.stringify(nativeEntry) +
+      ");if(typeof p.capture!=='function'||p.FILE!=='native-deactivate-admission.json')throw Error('native admission entry missing');process.stdout.write('NATIVE_REQUIRE_OK');";
+    const probeOptions = { cwd: temporary, encoding: "utf8", stdio: "pipe", env: { ...process.env, NODE_PATH: "" } };
+    assert.equal(cp.execFileSync(process.execPath, ["-e", nativeProbe], probeOptions), "NATIVE_REQUIRE_OK");
     const entry = path.join(temporary, "extension/scripts/mcp_stata_runtime_patch.js");
     const probe = "const p=require(" + JSON.stringify(entry) +
       ");if(typeof p.patchRuntime!=='function')throw Error('runtime entry missing');process.stdout.write('RUNTIME_REQUIRE_OK');";
@@ -50,7 +64,12 @@ async function extractScripts(destination) {
     assert.throws(() => cp.execFileSync(process.execPath, ["-e", probe], {
       cwd: temporary, encoding: "utf8", stdio: "pipe", env: { ...process.env, NODE_PATH: "" },
     }), error => /MODULE_NOT_FOUND/.test(String(error.stderr)));
+    fs.unlinkSync(nativeEntry);
+    assert.throws(() => cp.execFileSync(process.execPath, ["-e", nativeProbe], probeOptions),
+      error => /MODULE_NOT_FOUND/.test(String(error.stderr)));
     console.log(JSON.stringify({ verdict: "PASS", actualVsix: vsix,
-      actualRuntimeRequire: true, missingResourceNegativeControl: true, nativeVerified: false }));
+      actualRuntimeRequire: true, missingResourceNegativeControl: true,
+      nativeAdmissionModuleRequire: true, nativeDeactivationFragment: true,
+      missingNativeModuleNegativeControl: true, nativeVerified: false }));
   } finally { fs.rmSync(temporary, { recursive: true, force: true }); }
 })().catch(error => { console.error(error.stack || error); process.exitCode = 1; });
