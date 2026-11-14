@@ -195,16 +195,21 @@ async function main() {
     sameHost(host);
   });
   await check("TRA found and simulated installer branches update only private and child env", () => {
-    for (const installed of [false, true]) {
+    const platforms = [
+      { platform: "darwin", rules: path.posix, storage: "/fake/storage", uvDir: "/fake/storage/uv" },
+      { platform: "win32", rules: path.win32, storage: "C:\\fake\\storage", uvDir: "C:\\fake\\storage\\uv" },
+    ];
+    for (const { platform, rules, storage, uvDir } of platforms) for (const installed of [false, true]) {
       const host = watchedEnv({ PATH: "/host" }), r = runtime(fixed, host); let probes = 0, spawns = 0;
+      r.sandbox.process.platform = platform;
       Object.assign(r.sandbox, { UF: () => ++probes === 1 && installed ? null : "/fake/uv", ng() {}, LF() {},
-        rg: path, JA: { mkdirSync() {} }, gP: () => ({ command: "/fake/installer", args: [] }),
+        rg: rules, JA: { mkdirSync() {} }, gP: () => ({ command: "/fake/installer", args: [] }),
         mF() { throw Error("unexpected install failure prompt"); },
         mB: { spawnSync(command, args, options) { spawns++; assert.equal(command, "/fake/installer");
-          assert.equal(options.env.PATH, "/host"); assert.equal(options.env.UV_INSTALL_DIR, "/fake/storage/uv");
+          assert.equal(options.env.PATH, "/host"); assert.equal(options.env.UV_INSTALL_DIR, uvDir);
           assert.notEqual(options.env, r.api.getEnv()); options.env.CHILD_ONLY = "1"; return { status: 0 }; } },
       });
-      assert.equal(r.sandbox.TRA({ globalStoragePath: "/fake/storage" }), true);
+      assert.equal(r.sandbox.TRA({ globalStoragePath: storage }), true);
       assert.equal(spawns, Number(installed)); assert.equal(r.api.getEnv().MCP_STATA_UVX_CMD, "/fake/uv");
       assert.equal(r.api.getEnv().CHILD_ONLY, undefined); sameHost(host);
     }
