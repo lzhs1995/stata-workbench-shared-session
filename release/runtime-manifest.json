@@ -139,7 +139,7 @@
       "bytes": 11107
     },
     "dist/extension.js": {
-      "sha256": "2411023c90cf15b4617aa9c008b14232d50cc220cf6b41c74454a72559040e28",
+      "sha256": "920c0d83383bcc95a1420c69ac284c454100d3217315ba20effd3f29d9a116cd",
       "bytes": 5704933
     },
     "scripts/mac/png_compat_transform.js": {
@@ -343,7 +343,7 @@
       "bytes": 4729
     },
     "tools/verified_workbench.py": {
-      "sha256": "a4e475d730a0098c70411c38f40ce56867bc12886474c96c490e557a800fec49",
+      "sha256": "cccaaef719d3c6fe66c618d0a1d308fca052d66626a6458791a457c5440bce4e",
       "bytes": 25858
     },
     "tools/workbench_platform.py": {
