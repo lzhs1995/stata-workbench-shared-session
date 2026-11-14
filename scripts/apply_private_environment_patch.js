@@ -5,11 +5,10 @@
 const fingerprint = require("./finalize_bundle_identity");
 const MARKER = "/* Workbench: private runtime and debug environments */";
 const PAIRS = [
-  ['MO=process.env,GO=', 'MO={...process.env},GO='],
-  ['nag=g=>{MO=g||process.env}', 'nag=g=>{MO=g&&g!==process.env?g:{...process.env}}'],
+  ['MO=process.env,GO=', 'MO=require("../scripts/private_environment_core").snapshotEnvironment(process.env),GO='],
+  ['nag=g=>{MO=g||process.env}', 'nag=g=>{MO=g&&g!==process.env?g:require("../scripts/private_environment_core").snapshotEnvironment(process.env)}'],
   ['wag=()=>Ta.getStore()?.env||MO||process.env', 'wag=()=>Ta.getStore()?.env||MO'],
-  // Keep caller-owned request objects usable, but never alias the host env.
-  ['env:g?.env??MO,fs:g?.fs??GO', 'env:(__env=>__env===process.env?{...process.env}:__env??MO)(g?.env),fs:g?.fs??GO'],
+  ['env:g?.env??MO,fs:g?.fs??GO', 'env:(__env=>__env===process.env?require("../scripts/private_environment_core").snapshotEnvironment(process.env):__env??MO)(g?.env),fs:g?.fs??GO'],
   [
     'function jKA(g){g?process.env.DEBUG=g:delete process.env.DEBUG}function ZKA(){return process.env.DEBUG}',
     'var __codexPrivateDebugValue=process.env.DEBUG;function jKA(g){__codexPrivateDebugValue=g?`${g}`:void 0}function ZKA(){return __codexPrivateDebugValue}',
@@ -24,19 +23,16 @@ function once(source, needle, replacement) {
 
 function verifyPatched(source) {
   if (source.split(MARKER).length !== 2) throw new Error("missing or ambiguous private-environment marker");
-  for (const [before, after] of PAIRS) {
-    if (source.split(after).length !== 2 || source.includes(before))
-      throw new Error("partial or ambiguous private-environment patch: " + after.slice(0, 100));
-  }
+  if (!PAIRS.every(([before, after]) => source.split(after).length === 2 && !source.includes(before)))
+    throw new Error("partial or ambiguous private-environment patch");
 }
 
 function patchBundle(source, options = {}) {
-  if (source.includes(MARKER)) verifyPatched(source);
-  else {
+  if (!source.includes(MARKER)) {
     for (const [before, after] of PAIRS) source = once(source, before, after);
     source += "\n" + MARKER + "\n";
-    verifyPatched(source);
   }
+  verifyPatched(source);
   return options.finalize === false ? source : fingerprint.finalize(source).text;
 }
 

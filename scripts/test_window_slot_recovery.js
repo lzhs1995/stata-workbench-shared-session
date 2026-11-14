@@ -21,6 +21,42 @@ function fixture(t, record = owner(oldBoot)) {
   return { parent, slot, file, inspect: currentBoot => recovery.inspectSlot({ parent, number: 1, currentBoot: currentBoot || newBoot }) };
 }
 
+function mockLargeSlotIdentities(t, f) {
+  const original = 9007199254740992n, replacement = original + 1n, device = 73n;
+  const canonical = fs.realpathSync(f.parent);
+  const slots = new Set([f.slot, path.join(canonical, "1")]);
+  const owners = new Set([f.file, path.join(canonical, "1", "owner.json")]);
+  const native = { lstatSync: fs.lstatSync, fstatSync: fs.fstatSync, openSync: fs.openSync, closeSync: fs.closeSync };
+  const descriptors = new Map();
+  let ownerInode = original;
+  function substitute(stat, options, inode) {
+    stat.dev = options?.bigint ? device : Number(device);
+    stat.ino = options?.bigint ? inode : Number(inode);
+    return stat;
+  }
+  t.mock.method(fs, "lstatSync", (file, options) => {
+    const stat = native.lstatSync(file, options), name = String(file);
+    if (slots.has(name)) return substitute(stat, options, original + 2n);
+    return owners.has(name) ? substitute(stat, options, ownerInode) : stat;
+  });
+  // Bind fstat to the identity at open time, while all bytes and file types
+  // remain real. No assumption about the host filesystem's inode values.
+  t.mock.method(fs, "openSync", (file, ...args) => {
+    const fd = native.openSync(file, ...args);
+    if (owners.has(String(file))) descriptors.set(fd, ownerInode);
+    return fd;
+  });
+  t.mock.method(fs, "fstatSync", (fd, options) => {
+    const stat = native.fstatSync(fd, options);
+    return descriptors.has(fd) ? substitute(stat, options, descriptors.get(fd)) : stat;
+  });
+  t.mock.method(fs, "closeSync", fd => {
+    try { return native.closeSync(fd); }
+    finally { descriptors.delete(fd); }
+  });
+  return { original, replacement, replaceOwner: () => { ownerInode = replacement; } };
+}
+
 test("read-only inspection refuses same boot, unknown owner boot and malformed records", t => {
   for (const [record, reason] of [[owner(newBoot), "same-boot-cleanup-unresolved"],
     [{ ...owner(oldBoot), bootIdentity: undefined }, "owner-boot-unknown"],
@@ -58,6 +94,48 @@ test("owner contents, owner inode, slot directory, and current boot changes reje
   const f = fixture(t), proof = f.inspect();
   assert.throws(() => recovery.recoverSlot(proof, { readBootIdentity: () => thirdBoot }), { code: "SLOT_RECOVERY_CHANGED" });
   assert.ok(fs.existsSync(f.file));
+});
+
+test("adjacent owner inodes that collide as Numbers reject a same-byte replacement", t => {
+  const f = fixture(t), ids = mockLargeSlotIdentities(t, f), before = fs.readFileSync(f.file), proof = f.inspect();
+  assert.equal(Number(ids.original), Number(ids.replacement), "the fixture reproduces Number precision loss");
+  assert.equal(proof.eligible, true);
+  const oldOwner = path.join(f.parent, "original-owner.json");
+  fs.renameSync(f.file, oldOwner); fs.writeFileSync(f.file, before); ids.replaceOwner();
+  const fresh = f.inspect();
+  assert.equal(fresh.eligible, true); assert.equal(fresh.ownerSha256, proof.ownerSha256);
+  assert.deepEqual(fresh.directoryIdentity, proof.directoryIdentity, "only the owner inode changed");
+  assert.throws(() => recovery.recoverSlot(proof, { readBootIdentity: () => newBoot }), { code: "SLOT_RECOVERY_CHANGED" });
+  assert.equal(proof.ownerFileIdentity.ino, ids.original.toString());
+  assert.equal(fresh.ownerFileIdentity.ino, ids.replacement.toString());
+  assert.deepEqual(fs.readFileSync(f.file), before); assert.deepEqual(fs.readFileSync(oldOwner), before);
+  assert.equal(fs.existsSync(path.join(f.parent, "recovered")), false, "neither owner was archived by the refused action");
+});
+
+test("exact string identities survive proof JSON round trips and permit unchanged recovery", t => {
+  const f = fixture(t), ids = mockLargeSlotIdentities(t, f), before = fs.readFileSync(f.file), proof = f.inspect();
+  assert.equal(proof.eligible, true);
+  assert.deepEqual(proof.directoryIdentity, { dev: "73", ino: (ids.original + 2n).toString() });
+  assert.deepEqual(proof.ownerFileIdentity, { dev: "73", ino: ids.original.toString() });
+  const transported = JSON.parse(JSON.stringify(proof));
+  assert.deepEqual(transported, proof);
+  const result = recovery.recoverSlot(transported, { readBootIdentity: () => newBoot });
+  assert.equal(result.recovered, true); assert.deepEqual(result.signalled, []);
+  assert.equal(fs.existsSync(f.slot), false);
+  assert.deepEqual(fs.readFileSync(path.join(result.archivePath, "owner.json")), before);
+});
+
+test("legacy Number identity proofs are refused without converting or removing the original slot", t => {
+  const f = fixture(t); mockLargeSlotIdentities(t, f);
+  const before = fs.readFileSync(f.file), proof = f.inspect();
+  assert.equal(proof.eligible, true);
+  for (const fields of [["directoryIdentity"], ["ownerFileIdentity"], ["directoryIdentity", "ownerFileIdentity"]]) {
+    const legacy = JSON.parse(JSON.stringify(proof));
+    for (const field of fields) legacy[field] = { dev: Number(legacy[field].dev), ino: Number(legacy[field].ino) };
+    assert.throws(() => recovery.recoverSlot(legacy, { readBootIdentity: () => newBoot }), { code: "SLOT_RECOVERY_CHANGED" });
+    assert.deepEqual(fs.readFileSync(f.file), before); assert.deepEqual(fs.readdirSync(f.slot), ["owner.json"]);
+    assert.equal(fs.existsSync(path.join(f.parent, "recovered")), false);
+  }
 });
 
 test("unknown slot contents and symlinks are preserved and never recovered", t => {

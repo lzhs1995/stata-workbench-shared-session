@@ -10,7 +10,12 @@ const cp = require("node:child_process");
 
 function fail(code, detail) { throw Object.assign(new Error(`${code}: ${detail}`), { code }); }
 const sha = value => crypto.createHash("sha256").update(value).digest("hex");
-const identity = stat => ({ dev: stat.dev, ino: stat.ino });
+function identity(stat) {
+  if (typeof stat.dev !== "bigint" || typeof stat.ino !== "bigint")
+    fail("SLOT_IDENTITY_UNKNOWN", "exact filesystem identity is unavailable");
+  // JSON proofs must retain every bit; converting a rounded Number is too late.
+  return { dev: stat.dev.toString(), ino: stat.ino.toString() };
+}
 const same = (a, b) => !!a && !!b && a.dev === b.dev && a.ino === b.ino;
 
 function validateBootIdentity(value) {
@@ -67,12 +72,12 @@ function withSlotMutationLock(parent, operation, options = {}) {
       pause(Math.min(10, Math.max(1, end - now())));
     }
   }
-  const held = identity(fs.lstatSync(lockDir)), token = crypto.randomUUID();
+  const held = identity(fs.lstatSync(lockDir, { bigint: true })), token = crypto.randomUUID();
   const lockFile = path.join(lockDir, "owner.json");
   fs.writeFileSync(lockFile, JSON.stringify({ token, bootIdentity, pid: process.pid }), { flag: "wx", mode: 0o600 });
   function assertOwnership() {
     try {
-      if (!same(held, identity(fs.lstatSync(lockDir))) || JSON.parse(fs.readFileSync(lockFile, "utf8")).token !== token)
+      if (!same(held, identity(fs.lstatSync(lockDir, { bigint: true }))) || JSON.parse(fs.readFileSync(lockFile, "utf8")).token !== token)
         fail("SLOT_LOCK_CHANGED", "admission mutation lock changed");
     } catch (error) { if (error.code === "SLOT_LOCK_CHANGED") throw error; fail("SLOT_LOCK_CHANGED", "admission mutation lock is unreadable"); }
   }
@@ -92,7 +97,7 @@ function inspectSlot({ parent, number, currentBoot }) {
   parent = canonicalParent(parent);
   const slotDir = path.join(parent, String(number));
   let stat;
-  try { stat = fs.lstatSync(slotDir); }
+  try { stat = fs.lstatSync(slotDir, { bigint: true }); }
   catch (error) { if (error.code === "ENOENT") return { eligible: false, reason: "absent", parent, number }; throw error; }
   const base = { eligible: false, parent, number, currentBoot, directoryIdentity: identity(stat) };
   if (!stat.isDirectory() || stat.isSymbolicLink()) return { ...base, reason: "slot-directory-unknown" };
@@ -100,13 +105,13 @@ function inspectSlot({ parent, number, currentBoot }) {
   try {
     const names = fs.readdirSync(slotDir);
     if (names.length !== 1 || names[0] !== "owner.json") return { ...base, reason: "slot-contents-unknown" };
-    const ownerPath = path.join(slotDir, "owner.json"), before = fs.lstatSync(ownerPath);
-    if (!before.isFile() || before.isSymbolicLink() || before.size > 65536) return { ...base, reason: "owner-file-unknown" };
+    const ownerPath = path.join(slotDir, "owner.json"), before = fs.lstatSync(ownerPath, { bigint: true });
+    if (!before.isFile() || before.isSymbolicLink() || before.size > 65536n) return { ...base, reason: "owner-file-unknown" };
     const fd = fs.openSync(ownerPath, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW || 0));
-    try { fileStat = fs.fstatSync(fd); bytes = fs.readFileSync(fd); }
+    try { fileStat = fs.fstatSync(fd, { bigint: true }); bytes = fs.readFileSync(fd); }
     finally { fs.closeSync(fd); }
-    if (!same(identity(before), identity(fileStat)) || !same(identity(fileStat), identity(fs.lstatSync(ownerPath)))
-      || !same(base.directoryIdentity, identity(fs.lstatSync(slotDir)))) return { ...base, reason: "slot-changed-during-read" };
+    if (!same(identity(before), identity(fileStat)) || !same(identity(fileStat), identity(fs.lstatSync(ownerPath, { bigint: true })))
+      || !same(base.directoryIdentity, identity(fs.lstatSync(slotDir, { bigint: true })))) return { ...base, reason: "slot-changed-during-read" };
     owner = JSON.parse(bytes.toString("utf8"));
   } catch { return { ...base, reason: "owner-unreadable" }; }
   const proof = { ...base, ownerSha256: sha(bytes), ownerFileIdentity: identity(fileStat), owner };

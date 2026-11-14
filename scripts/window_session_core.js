@@ -221,11 +221,17 @@ async function runtimeTreeSha256(root, checkOpen, io = fs) {
   append(await walk(root)); check(); return hash.digest("hex");
 }
 
+function filesystemIdentity(stat) {
+  if (typeof stat.dev !== "bigint" || typeof stat.ino !== "bigint")
+    throw failure("FILESYSTEM_IDENTITY_UNKNOWN", "exact filesystem identity is unavailable");
+  return { dev: stat.dev.toString(), ino: stat.ino.toString() };
+}
+
 function runtimeDirectoryIdentity(runtime) {
-  const stat = fs.lstatSync(runtime);
+  const stat = fs.lstatSync(runtime, { bigint: true });
   if (!stat.isDirectory() || stat.isSymbolicLink())
     throw failure("RUNTIME_ORIGIN_UNVERIFIED", "the private runtime is not its original directory; preserve it for inspection");
-  return { dev: stat.dev, ino: stat.ino };
+  return filesystemIdentity(stat);
 }
 
 function readRuntimeOrigin(file, runtime) {
@@ -348,14 +354,14 @@ function createWindowSession(options = {}) {
       // No age/PID heuristic steals a live, stale or unreadable reservation.
       await new Promise(resolve => setTimeout(resolve, Math.min(25, remaining)));
     }
-    const identity = fs.lstatSync(lock);
+    const identity = filesystemIdentity(fs.lstatSync(lock, { bigint: true }));
     const ownerFile = path.join(lock, "owner.json");
     const owner = { token: crypto.randomUUID(), sessionId, extensionHostPid: process.pid,
       hostBirth: copyAuthority.hostBirth, stateRoot, dataDir };
     let written = false;
     function checkOwner() {
-      const current = fs.lstatSync(lock);
-      if (!current.isDirectory() || current.dev !== identity.dev || current.ino !== identity.ino)
+      const current = fs.lstatSync(lock, { bigint: true }), currentIdentity = filesystemIdentity(current);
+      if (!current.isDirectory() || currentIdentity.dev !== identity.dev || currentIdentity.ino !== identity.ino)
         throw failure("RUNTIME_COPY_OWNER_CHANGED", "copy reservation identity changed; preserve it for inspection");
       if (written) {
         let record;

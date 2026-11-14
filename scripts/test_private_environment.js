@@ -11,12 +11,37 @@ const crypto = require("node:crypto");
 const { AsyncLocalStorage } = require("node:async_hooks");
 const acorn = require("acorn");
 const patch = require("./apply_private_environment_patch");
+const environment = require("./private_environment_core");
+const fingerprint = require("./finalize_bundle_identity");
+// Exact preceding sealed layer, for explicit offline negative controls only.
+// Production patch/revert does not automatically migrate old private layers.
+const legacyPairs = [
+  ['MO=process.env,GO=', 'MO={...process.env},GO='],
+  ['nag=g=>{MO=g||process.env}', 'nag=g=>{MO=g&&g!==process.env?g:{...process.env}}'],
+  ['wag=()=>Ta.getStore()?.env||MO||process.env', 'wag=()=>Ta.getStore()?.env||MO'],
+  ['env:g?.env??MO,fs:g?.fs??GO', 'env:(__env=>__env===process.env?{...process.env}:__env??MO)(g?.env),fs:g?.fs??GO'],
+  patch.PAIRS[4],
+];
+const inMemory = process.argv.includes("--in-memory");
+assert(process.argv.slice(2).every(arg => arg === "--in-memory"), "only --in-memory is supported");
 const target = path.join(__dirname, "../dist/extension.js");
 const disk = fs.readFileSync(target, "utf8");
-const original = disk.includes(patch.MARKER) ? patch.revertBundle(disk) : disk;
+let original = disk;
+if (disk.includes(patch.MARKER)) {
+  if (disk.includes(patch.PAIRS[0][1])) original = patch.revertBundle(disk);
+  else {
+    assert(inMemory, "shipped bundle has the obsolete spread-only private environment layer");
+    assert.equal(shaBytes(disk), "37e98d77ffafdcb844561261ce54ab0a1a119fad9b191e1727775f69da73ec02", "only exact sealed old bundle is stripped in review mode");
+    for (const [before, after] of [...legacyPairs].reverse()) {
+      assert.equal(original.split(after).length, 2); original = original.replace(after, () => before);
+    }
+    original = fingerprint.finalize(original.replace("\n" + patch.MARKER + "\n", "")).text;
+  }
+}
 const changed = patch.patchBundle(original);
-assert.equal(disk, changed, "shipped bundle must contain the exact private-environment layer");
-const sha256 = value => crypto.createHash("sha256").update(value).digest("hex");
+if (!inMemory) assert.equal(disk, changed, "shipped bundle must contain the exact private-environment layer");
+function shaBytes(value) { return crypto.createHash("sha256").update(value).digest("hex"); }
+const sha256 = shaBytes;
 const cases = [], negativeControls = [];
 
 function index(source) {
@@ -47,25 +72,38 @@ function index(source) {
   result.fn = name => { assert(result.functions.has(name)); return result.text(result.functions.get(name)); };
   return result;
 }
-const old = index(original), fixed = index(changed);
-function watchedEnv(initial) {
+let legacyText = original;
+for (const [before, after] of legacyPairs) {
+  assert.equal(legacyText.split(before).length, 2);
+  legacyText = legacyText.replace(before, () => after);
+}
+legacyText += "\n" + patch.MARKER + "\n";
+legacyText = fingerprint.finalize(legacyText).text;
+const old = index(original), fixed = index(changed), legacy = index(legacyText);
+function watchedEnv(initial, insensitive = false) {
   const values = { ...initial }, writes = [];
+  const actual = key => typeof key === "string" && insensitive
+    ? Object.keys(values).find(name => name.toUpperCase() === key.toUpperCase()) ?? key : key;
   const env = new Proxy(values, {
-    set(obj, key, value) { const text = `${value}`; writes.push({ op: "set", key, value: text }); obj[key] = text; return true; },
-    deleteProperty(obj, key) { writes.push({ op: "delete", key }); return delete obj[key]; },
+    get(obj, key) { return obj[actual(key)]; },
+    set(obj, key, value) { const text = `${value}`; key = actual(key); writes.push({ op: "set", key, value: text }); obj[key] = text; return true; },
+    deleteProperty(obj, key) { key = actual(key); writes.push({ op: "delete", key }); return delete obj[key]; },
     defineProperty() { throw Error("unexpected environment defineProperty"); },
   });
   return { env, values, writes, initial: { ...values } };
 }
-function moduleContext(env) {
+function moduleContext(env, platform = "darwin", isMainThread = true) {
   const denied = () => { throw Error("unexpected external boundary"); };
   return {
-    process: { env, platform: "darwin", stderr: { fd: 2, write: denied } }, i() {},
+    process: { env, platform, stderr: { fd: 2, write: denied } }, i() {},
     D(factory) { let done = false; const module = { exports: {} }; return () => {
       if (!done) { done = true; factory(module.exports, module); } return module.exports;
     }; },
     require(name) {
       if (name === "async_hooks") return { AsyncLocalStorage };
+      if (name === "../scripts/private_environment_core") return {
+        snapshotEnvironment: source => environment.snapshotEnvironment(source, { platform, isMainThread }),
+      };
       if (name === "fs" || name === "child_process") return new Proxy({}, { get: () => denied });
       if (name === "tty") return { isatty: () => false };
       if (name === "util") return { deprecate: fn => fn, inspect: denied, formatWithOptions: denied };
@@ -74,8 +112,8 @@ function moduleContext(env) {
     a1: () => null, e1: () => value => String(value), console: { warn: denied },
   };
 }
-function runtime(code, watched) {
-  const sandbox = moduleContext(watched.env);
+function runtime(code, watched, platform, isMainThread) {
+  const sandbox = moduleContext(watched.env, platform, isMainThread);
   const api = vm.runInNewContext(code.module("Ji") + ";Ji();", sandbox);
   sandbox.uM = () => api.getEnv();
   vm.runInNewContext(code.fn("mRA") + ";" + code.fn("TRA"), sandbox);
@@ -109,6 +147,30 @@ function finalTransportEnv(code, params, host, platform) {
     Ae: {}, NF: { default: { env: host, platform } }, receiver: { _serverParams: params },
   });
 }
+function explicitConfig(code, env) {
+  const methods = code.nodes.filter(n => n.type === "MethodDefinition" && n.key.name === "_loadServerConfig");
+  assert.equal(methods.length, 1);
+  const Sample = vm.runInNewContext("(class Sample{" + code.text(methods[0]) + "})", {
+    MM: () => env, bA: path.win32, RF: "mcp_stata",
+    Lt: { readFileSync(file) {
+      assert.equal(file, "C:\\project\\explicit.json");
+      return JSON.stringify({ servers: { mcp_stata: { command: "explicit-python", args: [] } } });
+    }, existsSync() { throw Error("unexpected shared configuration lookup"); } },
+  });
+  const instance = new Sample(); instance._safeParseJson = JSON.parse; instance._log = () => {};
+  instance._hostMcpConfigPaths = () => []; instance._candidateMcpConfigPaths = () => [];
+  return instance._loadServerConfig({ hostOnly: true });
+}
+function windowsCaseFlow(code) {
+  const host = watchedEnv({ Path: "C:\\host", mcp_stata_no_reload_on_clear: "1",
+    mcp_stata_config_path: "C:\\project\\explicit.json" }, true);
+  const r = runtime(code, host, "win32", true); r.apply(false);
+  const env = r.api.getEnv(), config = explicitConfig(code, env);
+  const child = childConfig(code, env, config.env || {});
+  const final = finalTransportEnv(code, child, host.env, "win32");
+  const flags = Object.entries(final).filter(([key]) => key.toUpperCase() === "MCP_STATA_NO_RELOAD_ON_CLEAR");
+  return { host, env, config, flags };
+}
 async function check(name, fn) { await fn(); cases.push(name); }
 
 async function main() {
@@ -119,6 +181,79 @@ async function main() {
     assert.throws(() => patch.patchBundle(original.replace(patch.PAIRS[0][0], "missing")), /anchor/);
     assert.throws(() => patch.patchBundle(changed.replace(patch.PAIRS[1][1], patch.PAIRS[1][0])), /partial/);
     assert.throws(() => patch.patchBundle(changed + patch.PAIRS[0][1]), /ambiguous/);
+    assert.throws(() => patch.patchBundle(legacyText), /partial/, "production patch must not migrate the sealed older layer");
+  });
+  await check("same shipped Windows config/flag flow detects spread-only regression and verifies correction", () => {
+    assert.equal(sha256(legacyText), "37e98d77ffafdcb844561261ce54ab0a1a119fad9b191e1727775f69da73ec02");
+    const baseline = windowsCaseFlow(old), prior = windowsCaseFlow(legacy), next = windowsCaseFlow(fixed);
+    assert.equal(baseline.config.configPath, "C:\\project\\explicit.json");
+    assert.equal(baseline.flags.length, 0); assert.equal(baseline.host.writes.length, 1);
+    assert.equal(prior.config.configPath, null);
+    assert.deepEqual(prior.flags.map(([key, value]) => [key, value]), [["mcp_stata_no_reload_on_clear", "1"]]);
+    sameHost(prior.host);
+    assert.equal(next.config.configPath, "C:\\project\\explicit.json");
+    assert.equal(next.config.command, "explicit-python"); assert.equal(next.flags.length, 0);
+    assert.equal(Object.keys(next.env).filter(key => key.toUpperCase() === "MCP_STATA_NO_RELOAD_ON_CLEAR").length, 0);
+    sameHost(next.host);
+    negativeControls.push({ name: "sealed spread-only Windows regression", bundleSha256: sha256(legacyText),
+      priorConfigPath: prior.config.configPath, priorChildFlags: prior.flags,
+      fixedConfigPath: next.config.configPath, fixedChildFlags: next.flags });
+  });
+  await check("Windows main-thread case aliases cover get/set/delete/has/descriptors/enumeration without duplicates", () => {
+    const host = watchedEnv({ Path: "C:\\host" }, true), r = runtime(fixed, host, "win32", true), env = r.api.getEnv();
+    for (const key of ["PATH", "path", "pAtH"]) {
+      assert.equal(env[key], "C:\\host"); assert.equal(key in env, true); assert.equal(Object.hasOwn(env, key), true);
+      assert.deepEqual(Object.getOwnPropertyDescriptor(env, key), { value: "C:\\host", writable: true, enumerable: true, configurable: true });
+    }
+    env.PATH = 42; assert.equal(env.path, "42");
+    assert.deepEqual(Object.keys(env), ["Path"]); assert.deepEqual({ ...env }, { Path: "42" });
+    assert.equal(delete env.pAtH, true);
+    assert.equal("PATH" in env, false); assert.equal(Object.getOwnPropertyDescriptor(env, "path"), undefined);
+    assert.deepEqual(Object.keys(env), []);
+    env.path = false;
+    Object.defineProperty(env, "PATH", { value: null, writable: true, enumerable: true, configurable: true });
+    assert.equal(env.PaTh, "null"); assert.deepEqual(Object.keys(env), ["path"]);
+    assert.equal(Object.getOwnPropertyDescriptors(env).path.value, "null");
+    assert.throws(() => Object.defineProperty(env, "PATH", { value: "bad" }), /data descriptor/);
+    assert.throws(() => Object.defineProperty(env, "PATH", { get() { return "bad"; }, configurable: true, enumerable: true }), /data descriptor/);
+    assert.equal(env.path, "null");
+    assert.throws(() => Object.preventExtensions(env), /preventExtensions/);
+    sameHost(host);
+  });
+  await check("private host snapshots retain Node string-value coercion without mutating the source", () => {
+    for (const [platform, main] of [["darwin", true], ["win32", true], ["win32", false]]) {
+      const host = watchedEnv({ Seed: "source" }, platform === "win32" && main);
+      const env = runtime(fixed, host, platform, main).api.getEnv();
+      for (const [value, text] of [[undefined, "undefined"], [null, "null"], [false, "false"], [true, "true"], [0, "0"], [42, "42"]]) {
+        env.VALUE = value; assert.equal(env.VALUE, text);
+      }
+      env.VALUE = { toString: () => "object-string", valueOf() { throw Error("wrong primitive hint"); } };
+      assert.equal(env.VALUE, "object-string");
+      assert.throws(() => { env.VALUE = Symbol("invalid value"); }, /Symbol/);
+      assert.equal(env.VALUE, "object-string"); sameHost(host);
+    }
+  });
+  await check("Unix and Windows Worker snapshots remain case-sensitive", () => {
+    for (const [platform, main] of [["darwin", true], ["linux", true], ["win32", false]]) {
+      const host = watchedEnv({ Path: "mixed", PATH: "upper" }), env = runtime(fixed, host, platform, main).api.getEnv();
+      assert.equal(env.path, undefined); assert.equal("path" in env, false);
+      assert.equal(Object.getOwnPropertyDescriptor(env, "path"), undefined);
+      env.path = 3; assert.equal(env.Path, "mixed"); assert.equal(env.PATH, "upper"); assert.equal(env.path, "3");
+      delete env.PATH; assert.equal(env.Path, "mixed"); assert.equal(Object.hasOwn(env, "PATH"), false);
+      assert.deepEqual(Object.keys(env), ["Path", "path"]); sameHost(host);
+    }
+  });
+  await check("Windows default reset and host request copies preserve case rules while explicit mocks keep identity", () => {
+    const host = watchedEnv({ Path: "C:\\host", mcp_stata_no_reload_on_clear: "host" }, true);
+    const r = runtime(fixed, host, "win32", true), supplied = { Path: "case-sensitive mock" };
+    r.api.setDefaultEnv(supplied); assert.equal(r.api.getEnv(), supplied); assert.equal(r.api.getEnv().PATH, undefined);
+    for (const reset of [undefined, null, host.env]) {
+      r.api.setDefaultEnv(reset); assert.equal(r.api.getEnv().PATH, "C:\\host"); r.apply(false);
+      assert.equal(Object.keys(r.api.getEnv()).some(k => k.toUpperCase() === "MCP_STATA_NO_RELOAD_ON_CLEAR"), false);
+    }
+    r.api.runWithContext({ env: host.env }, () => { assert.equal(r.api.getEnv().PATH, "C:\\host"); r.apply(false); });
+    r.api.runWithContext({ env: supplied }, () => assert.equal(r.api.getEnv(), supplied));
+    sameHost(host);
   });
   await check("original shipped default mRA and TRA are effective negative controls", () => {
     const host = watchedEnv({ PATH: "/host" }), r = runtime(old, host);
@@ -267,7 +402,8 @@ async function main() {
     for (const name of ["nag", "Nag"]) assert.equal(old.nodes.filter(n => n.type === "CallExpression" && n.callee.name === name).length, 0);
   });
   assert.equal(fs.readFileSync(target, "utf8"), disk, "shipped bundle remains untouched");
-  console.log(JSON.stringify({ verdict: "PASS_OFFLINE_EXTRACTED_BEHAVIOR", tests: cases.length, cases, negativeControls,
+  console.log(JSON.stringify({ verdict: inMemory ? "PASS_IN_MEMORY_EXTRACTED_BEHAVIOR" : "PASS_OFFLINE_EXTRACTED_BEHAVIOR", tests: cases.length, cases, negativeControls,
+    inMemoryReview: inMemory, shippedLayerRequired: !inMemory,
     originalBundleSha256: sha256(original), inMemoryPatchedBundleSha256: sha256(changed), bundleUnchanged: true,
     executed: "only AST-extracted runtime-context, debug, mRA/TRA and child-env expressions; mocked external boundaries",
     live: false, sourceFilesWritten: false }, null, 2));

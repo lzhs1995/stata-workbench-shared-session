@@ -53,6 +53,20 @@ async function extractRuntime(destination) {
       ");if(typeof p.capture!=='function'||p.FILE!=='native-deactivate-admission.json')throw Error('native admission entry missing');process.stdout.write('NATIVE_REQUIRE_OK');";
     const probeOptions = { cwd: temporary, encoding: "utf8", stdio: "pipe", env: { ...process.env, NODE_PATH: "" } };
     assert.equal(cp.execFileSync(process.execPath, ["-e", nativeProbe], probeOptions), "NATIVE_REQUIRE_OK");
+    const environmentEntry = path.join(temporary, "extension/scripts/private_environment_core.js");
+    assert.deepEqual(fs.readFileSync(environmentEntry), fs.readFileSync(path.join(root, "scripts/private_environment_core.js")),
+      "Packaged private environment helper must match the reviewed source bytes");
+    const environmentInit = 'require("../scripts/private_environment_core").snapshotEnvironment(process.env)';
+    assert.equal(bundle.split('MO=' + environmentInit + ',GO=').length, 2,
+      "Unique actual packaged default environment initialization");
+    const environmentProbe = "const assert=require('node:assert/strict'),vm=require('node:vm');"
+      + "const loader=require('node:module').createRequire(" + JSON.stringify(path.join(temporary, "extension/dist/extension.js")) + ");"
+      + "const host={PATH:'/fixture',MCP_STATA_NO_RELOAD_ON_CLEAR:'1'};"
+      + "const isolated=vm.runInNewContext(" + JSON.stringify(environmentInit) + ",{require:loader,process:{env:host}});"
+      + "assert.notEqual(isolated,host);assert.equal(isolated.PATH,'/fixture');"
+      + "delete isolated.MCP_STATA_NO_RELOAD_ON_CLEAR;assert.equal(host.MCP_STATA_NO_RELOAD_ON_CLEAR,'1');"
+      + "process.stdout.write('PRIVATE_ENV_REQUIRE_OK');";
+    assert.equal(cp.execFileSync(process.execPath, ["-e", environmentProbe], probeOptions), "PRIVATE_ENV_REQUIRE_OK");
     const entry = path.join(temporary, "extension/scripts/mcp_stata_runtime_patch.js");
     const probe = "const p=require(" + JSON.stringify(entry) +
       ");if(typeof p.patchRuntime!=='function')throw Error('runtime entry missing');process.stdout.write('RUNTIME_REQUIRE_OK');";
@@ -67,9 +81,13 @@ async function extractRuntime(destination) {
     fs.unlinkSync(nativeEntry);
     assert.throws(() => cp.execFileSync(process.execPath, ["-e", nativeProbe], probeOptions),
       error => /MODULE_NOT_FOUND/.test(String(error.stderr)));
+    fs.unlinkSync(environmentEntry);
+    assert.throws(() => cp.execFileSync(process.execPath, ["-e", environmentProbe], probeOptions),
+      error => /MODULE_NOT_FOUND/.test(String(error.stderr)));
     console.log(JSON.stringify({ verdict: "PASS", actualVsix: vsix,
       actualRuntimeRequire: true, missingResourceNegativeControl: true,
       nativeAdmissionModuleRequire: true, nativeDeactivationFragment: true,
-      missingNativeModuleNegativeControl: true, nativeVerified: false }));
+      missingNativeModuleNegativeControl: true, privateEnvironmentModuleRequire: true,
+      actualPrivateEnvironmentInitialization: true, missingPrivateEnvironmentNegativeControl: true, nativeVerified: false }));
   } finally { fs.rmSync(temporary, { recursive: true, force: true }); }
 })().catch(error => { console.error(error.stack || error); process.exitCode = 1; });

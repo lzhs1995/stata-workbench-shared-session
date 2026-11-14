@@ -139,8 +139,8 @@
       "bytes": 11107
     },
     "dist/extension.js": {
-      "sha256": "37e98d77ffafdcb844561261ce54ab0a1a119fad9b191e1727775f69da73ec02",
-      "bytes": 5705266
+      "sha256": "3bbfb80726e7e963857c20db47aa9a741f73aae93fd50ea130451c0a12152e48",
+      "bytes": 5705455
     },
     "scripts/mac/png_compat_transform.js": {
       "sha256": "cdea12886a1d5bb5b4c2b3e38829de1c7e68ed70e7777e8d6e2eb02bb0ce3514",
@@ -343,7 +343,7 @@
       "bytes": 4729
     },
     "tools/verified_workbench.py": {
-      "sha256": "0acac335b0e4b8ca5f8ebd580fe84e7a4d121f0aee5291da4237af41254dd12b",
+      "sha256": "183ac48bc48a99442d31c1870ee6359f140d5139437da511707391214bc1393e",
       "bytes": 25858
     },
     "tools/workbench_platform.py": {
@@ -463,8 +463,8 @@
       "bytes": 11740
     },
     "scripts/window_session_core.js": {
-      "sha256": "e7c41dda20a282f85b7f534de0d8a62e2916ff72a06b655b93501e09cf5927a0",
-      "bytes": 28416
+      "sha256": "beda0872666732cffb31191a62df036d2025dfd01f3f4ab1abcb525b774648fc",
+      "bytes": 28811
     },
     "scripts/window_session_vscode.js": {
       "sha256": "1c3c3118c12a05be695e2d3e91b233743738177d2d523b8273ddc16aedb1de21",
@@ -519,20 +519,24 @@
       "bytes": 56516
     },
     "scripts/window_slot_recovery.js": {
-      "sha256": "58f52ab794f0297d152199063942d78bc3f1410adfd969dd09319718e1295f88",
-      "bytes": 9165
+      "sha256": "817bf20cd631d4ccde266910d720d8e7fc1f7827346524b3626476821e0b4757",
+      "bytes": 9552
     },
     "scripts/check_release.js": {
-      "sha256": "22b62daf42aefaf07c9bf6212ccef3e6194278bab7f730d6e7fd62ed5d754ed0",
-      "bytes": 2368
+      "sha256": "b9a2fccd225fc493dc87fbb063dc50cb199275c5de74ca3fd9ff85aac23ad87e",
+      "bytes": 2422
     },
     "scripts/native_close_evidence.js": {
       "sha256": "b6e91a84d279f5b5d74be92021e9e5d546775c89d6dd46fcc8a5033b894638f6",
       "bytes": 3629
     },
     "scripts/apply_private_environment_patch.js": {
-      "sha256": "b30fbc136c01f5e8c2fbeefbf7fe5097a9cd0c019c1bfcefb4197688ca1d25f6",
-      "bytes": 2321
+      "sha256": "e7066cf4cf85c7e6fdf81d0b838916fd10a273c57f1e065c33a12a7fcbf5b621",
+      "bytes": 2365
+    },
+    "scripts/private_environment_core.js": {
+      "sha256": "8a120f70a36fc60c72b1dc20c9a2487bb95ecab59c9e1d07e094138bc37a3f06",
+      "bytes": 2635
     }
   },
   "acceptanceStatus": "PENDING_DAILY_020_MAC_WINDOWS_REAL_AGENT",

@@ -29,6 +29,18 @@ function fixture(t) {
     patchRuntime: () => ({ ok: true }) };
 }
 
+function wideDirectoryIdentity(t, directory, inode) {
+  const lstat = fs.lstatSync;
+  t.mock.method(fs, "lstatSync", (file, options) => {
+    const stat = lstat(file, options);
+    if (stat && typeof file === "string" && path.resolve(file) === path.resolve(directory)) {
+      stat.dev = options?.bigint ? 23n : 23;
+      stat.ino = options?.bigint ? inode() : Number(inode());
+    }
+    return stat;
+  });
+}
+
 test("two ordinary windows share a workspace, not identities or mutable runtime", async (t) => {
   const f = fixture(t), env = { ...f.env }, before = { ...env };
   const a = createWindowSession({ ...f, env, workspacePath: "/same/project" });
@@ -200,6 +212,71 @@ test("concurrent first commands prepare only one runtime", async (t) => {
   const a = createWindowSession({ ...f, cloneRuntime: async (...args) => { copies++; return f.cloneRuntime(...args); } });
   const [one, two] = await Promise.all([a.prepare(), a.prepare()]);
   assert.equal(copies, 1); assert.equal(one, two);
+});
+
+test("wide runtime identity stays exact in JSON and permits an unchanged retry", async t => {
+  const f = fixture(t); let ready = false, copies = 0;
+  const session = createWindowSession({ ...f,
+    cloneRuntime: async (...args) => { copies++; return f.cloneRuntime(...args); },
+    patchRuntime: () => ({ ok: ready, status: "fixture pause" }) });
+  const runtime = path.join(session.dataDir, "runtime"), inode = 9007199254740993n;
+  wideDirectoryIdentity(t, runtime, () => inode);
+  await assert.rejects(session.prepare(), { code: "RUNTIME_PATCH_FAILED" });
+  const origin = JSON.parse(fs.readFileSync(path.join(session.dataDir, "runtime-origin.json")));
+  assert.deepEqual(origin.runtime, { dev: "23", ino: inode.toString() });
+  ready = true;
+  const config = await session.prepare();
+  assert.ok(fs.existsSync(config.command)); assert.equal(copies, 1);
+  await session.finishClose({ backendCleanup: "complete" });
+});
+
+test("legacy Number runtime proof is refused without rewriting its evidence", async t => {
+  const f = fixture(t), session = createWindowSession({ ...f,
+    patchRuntime: () => ({ ok: false, status: "fixture pause" }) });
+  const runtime = path.join(session.dataDir, "runtime"), originPath = path.join(session.dataDir, "runtime-origin.json");
+  wideDirectoryIdentity(t, runtime, () => 9007199254740993n);
+  await assert.rejects(session.prepare(), { code: "RUNTIME_PATCH_FAILED" });
+  const origin = JSON.parse(fs.readFileSync(originPath));
+  origin.runtime = { dev: Number(origin.runtime.dev), ino: Number(origin.runtime.ino) };
+  const legacy = JSON.stringify(origin); fs.writeFileSync(originPath, legacy);
+  await assert.rejects(session.prepare(), { code: "RUNTIME_ORIGIN_UNVERIFIED" });
+  assert.equal(fs.readFileSync(originPath, "utf8"), legacy);
+  assert.ok(fs.existsSync(runtime)); assert.equal(session.status().slot, null);
+});
+
+test("runtime replacement with an adjacent wide inode is preserved and refused", async t => {
+  const f = fixture(t), session = createWindowSession({ ...f,
+    patchRuntime: () => ({ ok: false, status: "fixture pause" }) });
+  const runtime = path.join(session.dataDir, "runtime"), originPath = path.join(session.dataDir, "runtime-origin.json");
+  let inode = 9007199254740992n;
+  wideDirectoryIdentity(t, runtime, () => inode);
+  await assert.rejects(session.prepare(), { code: "RUNTIME_PATCH_FAILED" });
+  const original = fs.readFileSync(originPath);
+  fs.renameSync(runtime, runtime + ".preserved");
+  fs.cpSync(runtime + ".preserved", runtime, { recursive: true });
+  inode += 1n; assert.equal(Number(inode), Number(inode - 1n), "fixture aliases when represented as Number");
+  await assert.rejects(session.prepare(), { code: "RUNTIME_ORIGIN_UNVERIFIED" });
+  assert.deepEqual(fs.readFileSync(originPath), original);
+  assert.ok(fs.existsSync(runtime)); assert.ok(fs.existsSync(runtime + ".preserved"));
+  assert.equal(session.status().slot, null);
+});
+
+test("copy-lock replacement with an adjacent wide inode cannot authorize publication or cleanup", async t => {
+  const f = fixture(t), lock = path.join(require("./window_session_admission").authorityRoot(f.home), "runtime-copy");
+  let inode = 9007199254740992n;
+  wideDirectoryIdentity(t, lock, () => inode);
+  const session = createWindowSession({ ...f, cloneRuntime: async (...args) => {
+    await f.cloneRuntime(...args);
+    fs.renameSync(lock, lock + ".preserved"); fs.mkdirSync(lock);
+    fs.copyFileSync(path.join(lock + ".preserved", "owner.json"), path.join(lock, "owner.json"));
+    inode += 1n;
+  } });
+  await assert.rejects(session.prepare(), { code: "RUNTIME_COPY_OWNER_CHANGED" });
+  assert.ok(fs.existsSync(path.join(lock, "owner.json")));
+  assert.ok(fs.existsSync(path.join(lock + ".preserved", "owner.json")));
+  assert.ok(fs.existsSync(path.join(session.dataDir, "runtime.partial")));
+  assert.equal(fs.existsSync(path.join(session.dataDir, "runtime")), false);
+  assert.equal(session.status().slot, null);
 });
 
 test("missing runtime and disk reserve fail before any backend starts", async (t) => {

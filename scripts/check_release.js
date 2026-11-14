@@ -13,6 +13,7 @@ const mutators = new Set(["node scripts/apply_rc7_shared_execution_patch.js", "n
 const commands = ["node scripts/audit_candidate_readonly.js", "node --check scripts/test_activation_isolation.js",
   "node scripts/test_activation_isolation.js", "node scripts/test_edit_proposal_core.js",
   "node --check scripts/apply_private_environment_patch.js",
+  "node --check scripts/private_environment_core.js",
   "node --test scripts/test_private_environment.js",
   "node scripts/test_edit_proposal_patch.js",
   "node --test scripts/test_window_session_core.js",
