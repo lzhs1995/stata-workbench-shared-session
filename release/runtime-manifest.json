@@ -463,8 +463,8 @@
       "bytes": 11740
     },
     "scripts/window_session_core.js": {
-      "sha256": "c37ede97c54059c4db48f53d20173d6158ae814cf51e7244800fd7b7e3a4e772",
-      "bytes": 21952
+      "sha256": "e7c41dda20a282f85b7f534de0d8a62e2916ff72a06b655b93501e09cf5927a0",
+      "bytes": 28416
     },
     "scripts/window_session_vscode.js": {
       "sha256": "1c3c3118c12a05be695e2d3e91b233743738177d2d523b8273ddc16aedb1de21",
@@ -507,8 +507,8 @@
       "bytes": 2929
     },
     "tools/workbench_agent.py": {
-      "sha256": "3020ca63631d756c190f5553f4842aa03e441110a59868170ff5ad40fa6a1fc8",
-      "bytes": 21851
+      "sha256": "2f6396de9c6aaf2bbb737d37fd65154efcbf83d193af4a0b06c4d0dbd20d5035",
+      "bytes": 22400
     },
     "tools/workbench_setup.py": {
       "sha256": "00ec80cb2c8d697cef82b31a2851b7b2960934c47634a870e7cc8df17465c28f",
