@@ -139,8 +139,8 @@
       "bytes": 11107
     },
     "dist/extension.js": {
-      "sha256": "920c0d83383bcc95a1420c69ac284c454100d3217315ba20effd3f29d9a116cd",
-      "bytes": 5704933
+      "sha256": "f99bd6cc3d79983051fbd882bd546a3aac3918e3a7d1318a38ac7dc7bf19b3d8",
+      "bytes": 5705093
     },
     "scripts/mac/png_compat_transform.js": {
       "sha256": "cdea12886a1d5bb5b4c2b3e38829de1c7e68ed70e7777e8d6e2eb02bb0ce3514",
@@ -343,7 +343,7 @@
       "bytes": 4729
     },
     "tools/verified_workbench.py": {
-      "sha256": "cccaaef719d3c6fe66c618d0a1d308fca052d66626a6458791a457c5440bce4e",
+      "sha256": "6baa4786950407b51e404f40830d564b40c8637e39aaebc00481e7e6bc3dccb7",
       "bytes": 25858
     },
     "tools/workbench_platform.py": {
@@ -495,8 +495,8 @@
       "bytes": 1852
     },
     "scripts/apply_backend_shutdown_patch.js": {
-      "sha256": "1ff254a4b61bb69abc9f18b77905c403b04e2cdaebfceb68ac21e3d43e55e8c6",
-      "bytes": 12033
+      "sha256": "c70fddaa1f16c24f0c9672657e211d7a9bbd1c0ac1836ac8a24c5fd384a0a1a0",
+      "bytes": 12101
     },
     "scripts/agent_edit_vscode.js": {
       "sha256": "32c1bdf48b685949dc1c185dd4a3ddcafe64290e12fe2a0314b48855e1161e40",
@@ -523,8 +523,12 @@
       "bytes": 9165
     },
     "scripts/check_release.js": {
-      "sha256": "22613bdf3aa50ecd6216ce8279e31bcdb36bd90c03915c6507a73299a64cf602",
-      "bytes": 2199
+      "sha256": "d6ebfbb76fbce9f39dfe23f161e8a670d3a5ec37dc51ccbe705d5a385adb13e5",
+      "bytes": 2254
+    },
+    "scripts/native_close_evidence.js": {
+      "sha256": "b6e91a84d279f5b5d74be92021e9e5d546775c89d6dd46fcc8a5033b894638f6",
+      "bytes": 3629
     }
   },
   "acceptanceStatus": "PENDING_DAILY_020_MAC_WINDOWS_REAL_AGENT",

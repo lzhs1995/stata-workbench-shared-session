@@ -19,6 +19,7 @@ const commands = ["node scripts/audit_candidate_readonly.js", "node --check scri
   "node --test scripts/test_window_slot_recovery.js",
   "node scripts/test_source_path_mappings.js",
   "node scripts/test_backend_shutdown.js",
+  "node --test scripts/test_native_close_evidence.js",
   "node scripts/test_backend_shutdown_bundle.js",
   "node scripts/test_backend_shutdown_process.js",
   "node scripts/test_backend_shutdown_darwin.js",

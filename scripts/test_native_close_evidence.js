@@ -1,15 +1,18 @@
 "use strict";
-// Actual regenerated deactivation fragment with real lifecycle, synthetic state
+// Actual shipped deactivation fragment with real lifecycle, synthetic state
 // and tiny temporary records only. No activation, sockets, processes or Stata.
 const test = require("node:test"), assert = require("node:assert/strict");
 const fs = require("node:fs"), os = require("node:os"), path = require("node:path"), vm = require("node:vm");
 const evidence = require("./native_close_evidence"), patch = require("./apply_backend_shutdown_patch");
 const { createLifecycle } = require("./backend_shutdown_core");
 const { historicalLayer, between } = require("./test_daily_bundle_helpers");
-const recorded = historicalLayer(fs.readFileSync(path.join(__dirname, "../dist/extension.js"), "utf8"), "./apply_backend_shutdown_patch");
+const shipped = fs.readFileSync(path.join(__dirname, "../dist/extension.js"), "utf8");
+const recorded = historicalLayer(shipped, "./apply_backend_shutdown_patch");
 const current = patch.patchBundle(patch.revertBundle(recorded, { finalize: false }), { finalize: false });
-const deactivate = between(current, "async function bHg(){", "function HF(g){");
-assert.equal(deactivate, patch.DEACTIVATE);
+const deactivate = between(shipped, "async function bHg(){", "function HF(g){");
+assert.equal(deactivate, patch.DEACTIVATE, "the shipped bundle must contain native admission capture");
+assert.equal(deactivate, between(current, "async function bHg(){", "function HF(g){"),
+  "the shipped deactivation entrypoint must match canonical patch replay");
 new vm.Script(current);
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r; }); return { promise, resolve }; };
 const tick = async () => { for (let i = 0; i < 40; i++) await Promise.resolve(); };
