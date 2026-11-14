@@ -9,7 +9,7 @@ const PAIRS = [
   ['nag=g=>{MO=g||process.env}', 'nag=g=>{MO=g&&g!==process.env?g:{...process.env}}'],
   ['wag=()=>Ta.getStore()?.env||MO||process.env', 'wag=()=>Ta.getStore()?.env||MO'],
   // Keep caller-owned request objects usable, but never alias the host env.
-  ['env:g?.env??MO,fs:g?.fs??GO', 'env:g?.env===process.env?{...process.env}:g?.env??MO,fs:g?.fs??GO'],
+  ['env:g?.env??MO,fs:g?.fs??GO', 'env:(__env=>__env===process.env?{...process.env}:__env??MO)(g?.env),fs:g?.fs??GO'],
   [
     'function jKA(g){g?process.env.DEBUG=g:delete process.env.DEBUG}function ZKA(){return process.env.DEBUG}',
     'var __codexPrivateDebugValue=process.env.DEBUG;function jKA(g){__codexPrivateDebugValue=g?`${g}`:void 0}function ZKA(){return __codexPrivateDebugValue}',

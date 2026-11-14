@@ -139,8 +139,8 @@
       "bytes": 11107
     },
     "dist/extension.js": {
-      "sha256": "0eed01a292834e402b284f4837954e2dee6bc8d03e193fdfa6db7abd8f14747b",
-      "bytes": 5705251
+      "sha256": "37e98d77ffafdcb844561261ce54ab0a1a119fad9b191e1727775f69da73ec02",
+      "bytes": 5705266
     },
     "scripts/mac/png_compat_transform.js": {
       "sha256": "cdea12886a1d5bb5b4c2b3e38829de1c7e68ed70e7777e8d6e2eb02bb0ce3514",
@@ -343,7 +343,7 @@
       "bytes": 4729
     },
     "tools/verified_workbench.py": {
-      "sha256": "9684e0c7f9095e7ed8dbb3a4f4414efe80283b153f0e8392e1f41f423c76b642",
+      "sha256": "0acac335b0e4b8ca5f8ebd580fe84e7a4d121f0aee5291da4237af41254dd12b",
       "bytes": 25858
     },
     "tools/workbench_platform.py": {
@@ -531,8 +531,8 @@
       "bytes": 3629
     },
     "scripts/apply_private_environment_patch.js": {
-      "sha256": "847a36e4de6fd400284fddc5610373a5e2188ee96a3b3d9b4d1c977d1da9a3fc",
-      "bytes": 2306
+      "sha256": "b30fbc136c01f5e8c2fbeefbf7fe5097a9cd0c019c1bfcefb4197688ca1d25f6",
+      "bytes": 2321
     }
   },
   "acceptanceStatus": "PENDING_DAILY_020_MAC_WINDOWS_REAL_AGENT",

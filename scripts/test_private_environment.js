@@ -165,6 +165,20 @@ async function main() {
     r.api.runWithContext({ env: host.env }, () => { assert.notEqual(r.api.getEnv(), host.env); r.apply(true); });
     sameHost(host);
   });
+  await check("request env getter is read once before classifying host aliases", () => {
+    const host = watchedEnv({ PATH: "/host" }), r = runtime(fixed, host);
+    for (const first of [{ PATH: "/private" }, host.env]) {
+      let reads = 0;
+      const context = { get env() { reads++; return reads === 1 ? first : host.env; } };
+      r.api.runWithContext(context, () => {
+        if (first === host.env) assert.notEqual(r.api.getEnv(), host.env);
+        else assert.equal(r.api.getEnv(), first);
+        r.apply(true);
+      });
+      assert.equal(reads, 1, "classify and store the same env value");
+    }
+    sameHost(host);
+  });
   await check("empty request env remains valid and an async failure restores the private default", async () => {
     const host = watchedEnv({ PATH: "/host" }), r = runtime(fixed, host);
     const defaults = r.api.getEnv(), empty = {};
