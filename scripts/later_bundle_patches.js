@@ -40,6 +40,7 @@ const LATER = [
   "./apply_window_session_patch",
   "./apply_backend_shutdown_patch",
   "./apply_stata_source_path_mappings_patch",
+  "./apply_private_environment_patch",
 ];
 
 function revertLaterPatches(source) {

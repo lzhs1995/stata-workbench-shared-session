@@ -8,7 +8,7 @@ const target = path.join(__dirname, "..", "dist", "extension.js");
 let text = fs.readFileSync(target, "utf8");
 // Ordinary-window layers deliberately replace legacy anchors. Peel their exact
 // recorded inverses before replaying legacy maintenance, then apply them last.
-for (const name of ["./apply_stata_source_path_mappings_patch", "./apply_backend_shutdown_patch", "./apply_window_session_patch"]) {
+for (const name of ["./apply_private_environment_patch", "./apply_stata_source_path_mappings_patch", "./apply_backend_shutdown_patch", "./apply_window_session_patch"]) {
   const layer = require(name);
   if (text.includes(layer.MARKER)) text = layer.revertBundle(text, { finalize: false });
 }
@@ -3490,6 +3490,7 @@ text = require("./apply_windows_kill_reset_patch").patchBundle(text, { finalize:
 text = require("./apply_window_session_patch").patchBundle(text, { finalize: false });
 text = require("./apply_backend_shutdown_patch").patchBundle(text, { finalize: false });
 text = require("./apply_stata_source_path_mappings_patch").patchBundle(text, { finalize: false });
+text = require("./apply_private_environment_patch").patchBundle(text, { finalize: false });
 text = require("./finalize_bundle_identity").finalize(text).text;
 fs.writeFileSync(target, text, "utf8");
 console.log(baseAlreadyApplied ? "RC7_SHARED_EXECUTION_UPDATED" : "RC7_SHARED_EXECUTION_APPLIED", target);
