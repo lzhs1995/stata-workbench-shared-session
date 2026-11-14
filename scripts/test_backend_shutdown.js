@@ -95,10 +95,11 @@ function fixture({createGate,connectGate,listGate,closeGate}={}) {
   const patched=patch.patchBundle(original,{finalize:false});
   new vm.Script(patched);
   assert.ok(patched.includes(patch.CLOSE_ENDPOINT),"new replay installs the current close route");
+  assert.ok(patched.includes(patch.DEACTIVATE),"new replay installs the native deactivation trace");
   assert.equal(sha(patch.patchBundle(patched,{finalize:false})),sha(patched));
   assert.equal(sha(patch.revertBundle(patched,{finalize:false})),sha(original));
   assert.throws(()=>patch.patchBundle(original.replace('async function bHg(){','async function renamed(){'),{finalize:false}),/anchor/);
   assert.throws(()=>patch.patchBundle(original+'async function bHg(){',{finalize:false}),/anchor/);
-  count+=7;
+  count+=8;
   console.log(JSON.stringify({verdict:"PASS",groups:count,scope:"offline lifecycle/patch only",distWritten:false}));
 })().catch(error=>{console.error(error);process.exitCode=1;});

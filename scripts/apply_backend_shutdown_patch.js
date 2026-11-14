@@ -8,7 +8,7 @@ const MARKER = "/* Workbench 0.2: fenced backend terminal shutdown */";
 const CORE = 'require("../scripts/backend_shutdown_runtime").lifecycle(this)';
 const ENSURE = `async _ensureClient(){return ${CORE}.ensureClient(async __scope=>{let __env=MM();if(!__scope._pypiVersion&&!__env.MCP_STATA_PACKAGE_SPEC)try{let __versions=await __scope._fetchLatestVersion();__scope._pypiVersion=__versions.latest}catch(__error){if(!${CORE}.status().closing)__scope._log("[mcp-stata] version lookup unavailable")}})}`;
 const DISPOSE = `async dispose(){return ${CORE}.dispose()}__codexLifecycle(){return ${CORE}}`;
-const DEACTIVATE = 'async function bHg(){let __l=zg.__codexLifecycle();globalThis.__codexShutdownResult=await __l.shutdown();try{await GB.flush(2e3)}catch{}}';
+const DEACTIVATE = 'async function bHg(){let __l=zg.__codexLifecycle();try{require("../scripts/native_close_evidence").capture(__l)}catch{}globalThis.__codexShutdownResult=await __l.shutdown();try{await GB.flush(2e3)}catch{}}';
 // Capture only detached public scalars before the same lifecycle establishes its
 // synchronous close fence. Final cleanup state cannot prove admission timing.
 const CLOSE_ENDPOINT = [
