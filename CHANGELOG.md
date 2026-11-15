@@ -1,3 +1,9 @@
+## 0.2.0 candidate — Cancel before the first session start
+
+- Cancel on a confirmed cold, idle session returns a no-op without preparing a runtime, reserving an engine slot, connecting, running a quiescence command or advancing recovery state. The notice says that nothing was stopped or restored.
+- Queued work, startup, warm-up, an existing backend, uncertain state and pending recovery keep the existing Stop behavior. Unknown or incomplete state never qualifies for the no-op.
+- Regression coverage invokes the actual registered callback with mocked process and transport boundaries. Candidate installation and live acceptance are recorded separately.
+
 ## 0.2.0-next.6 — warm-up identity, quiet commands, Stop during start-up
 
 Entries are in merge order. Each pull request was reviewed independently and passed CI on macOS 15

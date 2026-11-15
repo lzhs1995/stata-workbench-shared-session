@@ -111,8 +111,8 @@
       "bytes": 5178
     },
     "scripts/apply_rc7_shared_execution_patch.js": {
-      "sha256": "f8d4a02349367ce45829c9fbb6a773e4d3ec6374582612849950548045133793",
-      "bytes": 343163
+      "sha256": "b5d75833e310e8997a9600f12285af3dc1915766c06dcd44fe7437345153f066",
+      "bytes": 343286
     },
     "scripts/apply_rc64_routes_patch.js": {
       "sha256": "b01e1225f5844b632e24d616957fb9e565541345a10d6f4fbc640a4b034070b2",
@@ -139,8 +139,8 @@
       "bytes": 11107
     },
     "dist/extension.js": {
-      "sha256": "3bbfb80726e7e963857c20db47aa9a741f73aae93fd50ea130451c0a12152e48",
-      "bytes": 5705455
+      "sha256": "17b49381467c3ff1b7acfa41b39e15cf551c546567911096cac71c6c16271d36",
+      "bytes": 5705743
     },
     "scripts/mac/png_compat_transform.js": {
       "sha256": "cdea12886a1d5bb5b4c2b3e38829de1c7e68ed70e7777e8d6e2eb02bb0ce3514",
@@ -343,7 +343,7 @@
       "bytes": 4729
     },
     "tools/verified_workbench.py": {
-      "sha256": "183ac48bc48a99442d31c1870ee6359f140d5139437da511707391214bc1393e",
+      "sha256": "5bab33a61f27ee25dcc83cd27cbd244927f79fc3c0a788c5fe217d2a4cc216cc",
       "bytes": 25858
     },
     "tools/workbench_platform.py": {
@@ -523,8 +523,8 @@
       "bytes": 9552
     },
     "scripts/check_release.js": {
-      "sha256": "b9a2fccd225fc493dc87fbb063dc50cb199275c5de74ca3fd9ff85aac23ad87e",
-      "bytes": 2422
+      "sha256": "5c7d12bac85f484301cb30a5ed7f9f5701757dc9b256f515e6dfdafc5109e3d1",
+      "bytes": 2569
     },
     "scripts/native_close_evidence.js": {
       "sha256": "b6e91a84d279f5b5d74be92021e9e5d546775c89d6dd46fcc8a5033b894638f6",
@@ -537,6 +537,10 @@
     "scripts/private_environment_core.js": {
       "sha256": "8a120f70a36fc60c72b1dc20c9a2487bb95ecab59c9e1d07e094138bc37a3f06",
       "bytes": 2635
+    },
+    "scripts/cold_cancel_core.js": {
+      "sha256": "b54e92fd6e3f8898b01ff46f9e97393572ad89275aabfcd956cd4d676e509e95",
+      "bytes": 3641
     }
   },
   "acceptanceStatus": "PENDING_DAILY_020_MAC_WINDOWS_REAL_AGENT",

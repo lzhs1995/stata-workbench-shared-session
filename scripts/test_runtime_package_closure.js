@@ -67,6 +67,16 @@ async function extractRuntime(destination) {
       + "delete isolated.MCP_STATA_NO_RELOAD_ON_CLEAR;assert.equal(host.MCP_STATA_NO_RELOAD_ON_CLEAR,'1');"
       + "process.stdout.write('PRIVATE_ENV_REQUIRE_OK');";
     assert.equal(cp.execFileSync(process.execPath, ["-e", environmentProbe], probeOptions), "PRIVATE_ENV_REQUIRE_OK");
+    const coldEntry = path.join(temporary, "extension/scripts/cold_cancel_core.js");
+    assert.deepEqual(fs.readFileSync(coldEntry), fs.readFileSync(path.join(root, "scripts/cold_cancel_core.js")),
+      "Packaged cold Cancel helper must match the reviewed source bytes");
+    const coldCall = 'require("../scripts/cold_cancel_core").coldNoop(zg,globalThis,__reason)';
+    assert.equal(bundle.split(coldCall).length, 2, "Actual packaged Stop calls the cold Cancel helper once");
+    const coldProbe = "const assert=require('node:assert/strict'),vm=require('node:vm');"
+      + "const loader=require('node:module').createRequire(" + JSON.stringify(path.join(temporary, "extension/dist/extension.js")) + ");"
+      + "assert.equal(vm.runInNewContext(" + JSON.stringify(coldCall)
+      + ",{require:loader,zg:{},__reason:'package boundary'}),null);process.stdout.write('COLD_CANCEL_REQUIRE_OK');";
+    assert.equal(cp.execFileSync(process.execPath, ["-e", coldProbe], probeOptions), "COLD_CANCEL_REQUIRE_OK");
     const entry = path.join(temporary, "extension/scripts/mcp_stata_runtime_patch.js");
     const probe = "const p=require(" + JSON.stringify(entry) +
       ");if(typeof p.patchRuntime!=='function')throw Error('runtime entry missing');process.stdout.write('RUNTIME_REQUIRE_OK');";
@@ -84,10 +94,14 @@ async function extractRuntime(destination) {
     fs.unlinkSync(environmentEntry);
     assert.throws(() => cp.execFileSync(process.execPath, ["-e", environmentProbe], probeOptions),
       error => /MODULE_NOT_FOUND/.test(String(error.stderr)));
+    fs.unlinkSync(coldEntry);
+    assert.throws(() => cp.execFileSync(process.execPath, ["-e", coldProbe], probeOptions),
+      error => /MODULE_NOT_FOUND/.test(String(error.stderr)));
     console.log(JSON.stringify({ verdict: "PASS", actualVsix: vsix,
       actualRuntimeRequire: true, missingResourceNegativeControl: true,
       nativeAdmissionModuleRequire: true, nativeDeactivationFragment: true,
       missingNativeModuleNegativeControl: true, privateEnvironmentModuleRequire: true,
-      actualPrivateEnvironmentInitialization: true, missingPrivateEnvironmentNegativeControl: true, nativeVerified: false }));
+      actualPrivateEnvironmentInitialization: true, missingPrivateEnvironmentNegativeControl: true,
+      actualColdCancelRequire: true, missingColdCancelNegativeControl: true, nativeVerified: false }));
   } finally { fs.rmSync(temporary, { recursive: true, force: true }); }
 })().catch(error => { console.error(error.stack || error); process.exitCode = 1; });
