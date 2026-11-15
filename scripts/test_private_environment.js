@@ -26,12 +26,17 @@ const inMemory = process.argv.includes("--in-memory");
 assert(process.argv.slice(2).every(arg => arg === "--in-memory"), "only --in-memory is supported");
 const target = path.join(__dirname, "../dist/extension.js");
 const disk = fs.readFileSync(target, "utf8");
-let original = disk;
-if (disk.includes(patch.MARKER)) {
-  if (disk.includes(patch.PAIRS[0][1])) original = patch.revertBundle(disk);
+// Historical negative controls retain their exact sealed bytes. The helper also
+// reapplies later layers and requires byte-exact equality with the final bundle.
+const privateLayer = disk.includes(require("./apply_cold_cancel_noop_patch").MARKER)
+  ? require("./test_daily_bundle_helpers").historicalLayer(disk, "./apply_private_environment_patch")
+  : disk;
+let original = privateLayer;
+if (privateLayer.includes(patch.MARKER)) {
+  if (privateLayer.includes(patch.PAIRS[0][1])) original = patch.revertBundle(privateLayer);
   else {
     assert(inMemory, "shipped bundle has the obsolete spread-only private environment layer");
-    assert.equal(shaBytes(disk), "37e98d77ffafdcb844561261ce54ab0a1a119fad9b191e1727775f69da73ec02", "only exact sealed old bundle is stripped in review mode");
+    assert.equal(shaBytes(privateLayer), "37e98d77ffafdcb844561261ce54ab0a1a119fad9b191e1727775f69da73ec02", "only exact sealed old bundle is stripped in review mode");
     for (const [before, after] of [...legacyPairs].reverse()) {
       assert.equal(original.split(after).length, 2); original = original.replace(after, () => before);
     }
@@ -39,7 +44,10 @@ if (disk.includes(patch.MARKER)) {
   }
 }
 const changed = patch.patchBundle(original);
-if (!inMemory) assert.equal(disk, changed, "shipped bundle must contain the exact private-environment layer");
+if (!inMemory) {
+  assert.equal(privateLayer, changed, "shipped bundle must contain the exact private-environment layer");
+  assert.equal(patch.patchBundle(disk), disk, "private-environment patch is idempotent on the final bundle");
+}
 function shaBytes(value) { return crypto.createHash("sha256").update(value).digest("hex"); }
 const sha256 = shaBytes;
 const cases = [], negativeControls = [];
@@ -79,7 +87,7 @@ for (const [before, after] of legacyPairs) {
 }
 legacyText += "\n" + patch.MARKER + "\n";
 legacyText = fingerprint.finalize(legacyText).text;
-const old = index(original), fixed = index(changed), legacy = index(legacyText);
+const old = index(original), fixed = index(inMemory ? changed : disk), legacy = index(legacyText);
 function watchedEnv(initial, insensitive = false) {
   const values = { ...initial }, writes = [];
   const actual = key => typeof key === "string" && insensitive
@@ -404,7 +412,8 @@ async function main() {
   assert.equal(fs.readFileSync(target, "utf8"), disk, "shipped bundle remains untouched");
   console.log(JSON.stringify({ verdict: inMemory ? "PASS_IN_MEMORY_EXTRACTED_BEHAVIOR" : "PASS_OFFLINE_EXTRACTED_BEHAVIOR", tests: cases.length, cases, negativeControls,
     inMemoryReview: inMemory, shippedLayerRequired: !inMemory,
-    originalBundleSha256: sha256(original), inMemoryPatchedBundleSha256: sha256(changed), bundleUnchanged: true,
+    originalBundleSha256: sha256(original), inMemoryPatchedBundleSha256: sha256(changed),
+    finalBundleSha256: sha256(disk), fixedBehaviorExtractedFromFinalBundle: !inMemory, bundleUnchanged: true,
     executed: "only AST-extracted runtime-context, debug, mRA/TRA and child-env expressions; mocked external boundaries",
     live: false, sourceFilesWritten: false }, null, 2));
 }
