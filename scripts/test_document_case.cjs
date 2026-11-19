@@ -18,7 +18,7 @@ if (!process.env.DOCUMENT_CASE_FIXTURES)
 fs.mkdirSync(fixtureRoot, { recursive: true });
 
 function fixture(platform = "win32", documentPath) {
-  const root = fs.mkdtempSync(path.join(fixtureRoot, platform + "-"));
+  const root = fs.realpathSync(fs.mkdtempSync(path.join(fixtureRoot, platform + "-")));
   const win = platform === "win32", paths = win ? path.win32 : path.posix;
   const logicalRoot = win ? "C:\\workspace" : path.join(root, "workspace");
   const file = paths.join(logicalRoot, "source.do");
