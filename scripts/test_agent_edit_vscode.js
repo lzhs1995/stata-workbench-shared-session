@@ -87,3 +87,7 @@ test("workflow run ID is durably reserved once, and continuations bind the pause
   assert.throws(() => f.api.bindRun(continuation, "r2"), /PAUSED_RUN_CHANGED/);
   assert.equal((await f.route("GET", "/agent-runs/wf_2")).code, 404);
 });
+
+// Keep document identity coverage in the agent route suite.
+require("./test_document_case.cjs");
+require("./test_document_ambiguity");

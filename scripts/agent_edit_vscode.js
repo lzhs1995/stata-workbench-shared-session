@@ -13,8 +13,17 @@ function createAgentApi(vscode, options) {
   });
   options.subscriptions?.push(provider);
   function inspect(file) {
-    const doc = vscode.workspace.textDocuments.find(d => d.uri.scheme === "file" && path.resolve(d.uri.fsPath) === path.resolve(file));
-    if (!doc || doc.isClosed) throw new Error("EDITOR_DOCUMENT_UNAVAILABLE");
+    const documentPath = value => {
+      const resolved = path.resolve(value);
+      // VS Code can lowercase a Windows drive letter. Keep all other casing
+      // exact, including POSIX paths and case-sensitive Windows directories.
+      return process.platform === "win32" ? resolved.replace(/^[A-Z]:/, drive => drive.toLowerCase()) : resolved;
+    };
+    const candidates = vscode.workspace.textDocuments.filter(d => d.uri.scheme === "file" && documentPath(d.uri.fsPath) === documentPath(file));
+    // Equivalent document objects must not hide a dirty buffer behind the first match.
+    if (candidates.length !== 1) throw new Error("EDITOR_DOCUMENT_UNAVAILABLE");
+    const doc = candidates[0];
+    if (doc.isClosed) throw new Error("EDITOR_DOCUMENT_UNAVAILABLE");
     if (!documentIds.has(doc)) documentIds.set(doc, ++sequence);
     return { ...options.identity(), dirty: doc.isDirty, version: doc.version, documentId: documentIds.get(doc),
       workspaceRoots: (vscode.workspace.workspaceFolders || []).filter(f => f.uri.scheme === "file").map(f => f.uri.fsPath) };

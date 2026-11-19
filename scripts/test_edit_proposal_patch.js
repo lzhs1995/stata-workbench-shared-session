@@ -33,3 +33,7 @@ test("auth refusals do not reach agent route", () => {
     assert.equal(sent, status); assert.equal(reached, false);
   }
 });
+
+// Both test:edit-gate and the release checker run this entry point.
+// Cover the actual adapter routes as well as their bundle wiring.
+require("./test_agent_edit_vscode");
