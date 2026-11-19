@@ -8,7 +8,7 @@ function fixture(t) {
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   const file = path.join(root, "analysis.do"); fs.writeFileSync(file, "display 1\n");
   const uri = { scheme: "file", fsPath: file };
-  const doc = { uri, version: 1, isDirty: false }, calls = [], providers = [];
+  const doc = { uri, version: 1, isDirty: false }, calls = [], providers = [], warnings = [];
   let click = async () => "Accept";
   const vscode = {
     Uri: { file: fsPath => ({ scheme: "file", fsPath }), parse: str => ({ scheme: str.split(":")[0], toString: () => str }) },
@@ -16,7 +16,7 @@ function fixture(t) {
       registerTextDocumentContentProvider: (scheme, provider) => { providers.push([scheme, provider]); return { dispose() {} }; },
       openTextDocument: async () => doc },
     commands: { executeCommand: async (...args) => { calls.push(args); } },
-    window: { showInformationMessage: (...args) => click(...args) },
+    window: { showInformationMessage: (...args) => click(...args), showWarningMessage: async message => { warnings.push(message); } },
   };
   const identity = { sessionId: "s1", generation: 1, closing: false };
   const state = { busy: true, runId: "r1" };
@@ -31,7 +31,7 @@ function fixture(t) {
       if (method === "POST") { req.emit("data", Buffer.from(JSON.stringify(body))); req.emit("end"); }
     });
   }
-  return { root, file, doc, identity, state, api, request, route, calls, providers, setClick: fn => { click = fn; }, stops: () => stops };
+  return { root, file, doc, identity, state, api, request, route, calls, providers, warnings, setClick: fn => { click = fn; }, stops: () => stops };
 }
 test("readonly diff displays captured bytes; Accept never executes or auto-runs", async t => {
   const f = fixture(t), d = await f.api.documentState(f.request);
@@ -45,6 +45,48 @@ test("readonly diff displays captured bytes; Accept never executes or auto-runs"
   });
   const result = await f.api.gate.propose(f.request, f.api.review);
   assert.equal(result.status, "accepted"); assert.equal(f.calls.length, 1); assert.equal(f.stops(), 0);
+  assert.deepEqual(f.warnings, []);
+});
+test("Accept after an unsaved edit explains the rejected proposal once and preserves the file", async t => {
+  const f = fixture(t);
+  f.request.expectedSha256 = (await f.api.documentState(f.request)).sha256;
+  let decide;
+  f.setClick(() => new Promise(resolve => { decide = resolve; }));
+  assert.equal((await f.route("POST", "/propose-edit", f.request)).code, 202);
+  await new Promise(setImmediate);
+  assert.equal(f.calls[0][0], "vscode.diff");
+  assert.equal((await f.route("POST", "/propose-edit", f.request)).code, 202);
+  f.doc.version++;
+  f.doc.isDirty = true;
+  decide("Accept");
+  await f.api.gate.propose(f.request, f.api.review);
+  const result = (await f.route("GET", "/proposals/p1")).value.proposal;
+  assert.equal(result.status, "rejected");
+  assert.equal(result.reasonCode, "DIRTY_DOCUMENT");
+  assert.equal(result.snapshotPath, undefined);
+  const state = await f.api.documentState(f.request);
+  assert.equal(state.sha256, f.request.expectedSha256);
+  assert.equal(state.dirty, true);
+  assert.equal(state.documentVersion, 2);
+  assert.deepEqual((await f.route("POST", "/propose-edit", f.request)).value.proposal, result);
+  assert.equal(f.warnings.length, 1);
+  assert.ok(f.warnings[0].includes(f.file));
+  assert.match(f.warnings[0], /unsaved edits/i);
+  assert.equal(f.calls.length, 1);
+});
+test("a refusal before review and an explicit Reject have no conflict notification", async t => {
+  const f = fixture(t);
+  f.request.expectedSha256 = (await f.api.documentState(f.request)).sha256;
+  f.doc.isDirty = true;
+  const before = await f.route("POST", "/propose-edit", f.request);
+  assert.equal(before.value.proposal.reasonCode, "DIRTY_DOCUMENT");
+  assert.equal(f.calls.length, 0);
+  f.doc.isDirty = false;
+  const next = { ...f.request, proposalId: "p2" };
+  f.setClick(async () => { f.doc.isDirty = true; return "Reject"; });
+  await f.route("POST", "/propose-edit", next);
+  assert.equal((await f.api.gate.propose(next, f.api.review)).reasonCode, "USER_REJECTED");
+  assert.deepEqual(f.warnings, []);
 });
 test("proposal POST returns pending immediately; GET finds durable final result", async t => {
   const f = fixture(t); f.request.expectedSha256 = (await f.api.documentState(f.request)).sha256;

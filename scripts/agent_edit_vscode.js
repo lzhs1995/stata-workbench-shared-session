@@ -28,8 +28,17 @@ function createAgentApi(vscode, options) {
     return { ...options.identity(), dirty: doc.isDirty, version: doc.version, documentId: documentIds.get(doc),
       workspaceRoots: (vscode.workspace.workspaceFolders || []).filter(f => f.uri.scheme === "file").map(f => f.uri.fsPath) };
   }
+  const conflictReasons = {
+    DIRTY_DOCUMENT: "The document has unsaved edits.",
+    DOCUMENT_VERSION_CHANGED: "The document changed during review.",
+    SHA_CHANGED_DURING_REVIEW: "The file on disk changed during review.",
+    TARGET_IDENTITY_CHANGED: "The open document or its file was replaced during review.",
+  };
   const gate = createEditGate({ snapshotRoot: options.snapshotRoot, recordRoot: options.recordRoot,
-    inspect, onEvent: options.onEvent });
+    inspect, onEvent: options.onEvent, onAcceptRejected(record) {
+      const reason = conflictReasons[record.reasonCode];
+      if (reason) return vscode.window.showWarningMessage("Edit proposal for " + record.path + " was rejected. " + reason);
+    } });
 
   async function documentState(request) {
     if (!request.path || !path.isAbsolute(request.path) || !/\.(do|ado|mata)$/i.test(request.path)) throw new Error("absolute Stata source path required");

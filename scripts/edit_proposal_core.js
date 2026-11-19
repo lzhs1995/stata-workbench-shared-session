@@ -122,7 +122,12 @@ function createEditGate(options = {}) {
       const write = previous.catch(() => {}).then(() => {
         if (Number(now()) >= Date.parse(record.expiresAt) || controller.signal.aborted) return terminal(record, "timeout", "DECISION_TIMEOUT");
         let current;
-        try { current = inspect(request, baseline.state); } catch (error) { return terminal(record, "rejected", error.message); }
+        try { current = inspect(request, baseline.state); } catch (error) {
+          const rejected = terminal(record, "rejected", error.message);
+          // The durable decision does not depend on the editor delivering its notification.
+          Promise.resolve().then(() => options.onAcceptRejected?.(rejected)).catch(() => {});
+          return rejected;
+        }
         fs.mkdirSync(snapshotRoot, { recursive: true, mode: 0o700 });
         const snapshot = path.join(snapshotRoot, record.id + ".snapshot");
         const snapshotFd = fs.openSync(snapshot, "wx", 0o600);
