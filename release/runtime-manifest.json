@@ -419,8 +419,8 @@
       "bytes": 4239
     },
     "scripts/edit_proposal_core.js": {
-      "sha256": "39d6d22217f8dc783e5996a6bdf1507c6e4f999b39aca875d30baa6cfe4f3a77",
-      "bytes": 9842
+      "sha256": "393ccbb32467b6b98df0ba57250e1268be65f40a3b7ea13c229387268884418d",
+      "bytes": 10084
     },
     "scripts/apply_restore_readiness_patch.js": {
       "sha256": "a5d42211ea04c39f38bd0f2306fddad03ceaae74afebbe9b47cbf74fa8cfa1b5",
@@ -499,8 +499,8 @@
       "bytes": 12101
     },
     "scripts/agent_edit_vscode.js": {
-      "sha256": "7fe4d92bf35acde2c4b0ec5874bbd26ff0f7d36228aa7aef1088d656b0506d03",
-      "bytes": 8079
+      "sha256": "6f8dd857b3cd2abbebf0b32dcf331e96f897aa3832ccf1ec8a2d81339b9b962c",
+      "bytes": 8615
     },
     "scripts/apply_stata_source_path_mappings_patch.js": {
       "sha256": "698612473a597a2e12ef245f8de89c4261319ed1ef3e4c74cd56f1b681124abd",
