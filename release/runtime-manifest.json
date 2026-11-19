@@ -499,8 +499,8 @@
       "bytes": 12101
     },
     "scripts/agent_edit_vscode.js": {
-      "sha256": "32c1bdf48b685949dc1c185dd4a3ddcafe64290e12fe2a0314b48855e1161e40",
-      "bytes": 7522
+      "sha256": "7fe4d92bf35acde2c4b0ec5874bbd26ff0f7d36228aa7aef1088d656b0506d03",
+      "bytes": 8079
     },
     "scripts/apply_stata_source_path_mappings_patch.js": {
       "sha256": "698612473a597a2e12ef245f8de89c4261319ed1ef3e4c74cd56f1b681124abd",
