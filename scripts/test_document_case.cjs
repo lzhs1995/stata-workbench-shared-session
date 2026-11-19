@@ -20,16 +20,17 @@ fs.mkdirSync(fixtureRoot, { recursive: true });
 function fixture(platform = "win32", documentPath) {
   const root = fs.realpathSync(fs.mkdtempSync(path.join(fixtureRoot, platform + "-")));
   const win = platform === "win32", paths = win ? path.win32 : path.posix;
-  const logicalRoot = win ? "C:\\workspace" : path.join(root, "workspace");
+  const logicalRoot = win ? "C:\\workspace" : "/workspace";
   const file = paths.join(logicalRoot, "source.do");
   function physical(value) {
-    if (typeof value !== "string" || !win) return value;
+    if (typeof value !== "string") return value;
+    if (!win) return path.join(root, paths.relative("/", value));
     const normalized = paths.resolve(value), match = /^([A-Za-z]):\\(.*)$/.exec(normalized);
     assert.ok(match, "test filesystem requires an absolute drive path");
     return path.join(root, match[1].toLowerCase(), ...match[2].split("\\"));
   }
   function logical(value) {
-    if (!win) return value;
+    if (!win) return "/" + path.relative(root, value).split(path.sep).join("/");
     const parts = path.relative(root, value).split(path.sep);
     const drive = parts.shift();
     assert.match(drive, /^[a-z]$/);
@@ -72,7 +73,7 @@ function fixture(platform = "win32", documentPath) {
     window: { showInformationMessage() { uiCalls++; throw new Error("UI forbidden in offline test"); } } };
   const api = load("agent_edit_vscode").createAgentApi(vscode, {
     identity: () => identity, current: () => ({}),
-    snapshotRoot: win ? "C:\\snapshots" : path.join(root, "snapshots") });
+    snapshotRoot: win ? "C:\\snapshots" : "/snapshots" });
   const core = load("edit_proposal_core");
   const request = { proposalId: "case", path: file, expectedSha256: core.sha256(before),
     content, documentVersion: 1, sessionId: identity.sessionId, generation: 0 };
