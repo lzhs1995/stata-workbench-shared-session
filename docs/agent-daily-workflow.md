@@ -1,6 +1,6 @@
 # Codex and Claude Code: daily Workbench workflow
 
-This contract targets the **Stata Workbench Shared Session 0.2.0 candidate**,
+This contract targets the **Stata Workbench Shared Session 0.2.1 candidate**,
 which is undergoing delivery and is **not released**, extension ID
 `lzhs1995.stata-workbench-shared-session`. The agent CLI is shipped in
 `tools/workbench_agent.py`. It uses the authenticated local window registry;
@@ -8,14 +8,14 @@ it does not launch a new VS Code window, install an extension, choose another
 session or recover a stale session. Manually Start the intended window before
 agent work; a submission can still invoke that session's backend warm-up.
 Release installation and actual-host acceptance
-must be completed against the integrated 0.2.0 package before calling this a
+must be completed against the integrated 0.2.1 package before calling this a
 validated daily installation. Next evidence is not evidence for that package.
 
 ## Install and discover once
 
-Install a locally supplied, reviewed 0.2.0 VSIX in the **ordinary local VS Code
+Install a locally supplied, reviewed 0.2.1 VSIX in the **ordinary local VS Code
 profile** used for work, using Extensions → Install from VSIX. Verify its
-SHA256 against that delivery's reviewed value; no public 0.2.0 download URL is
+SHA256 against that delivery's reviewed value; no public 0.2.1 download URL is
 asserted yet. Follow [installation prerequisites](../README.md#install) first;
 installing the VSIX does not provision or validate the Stata service runtime.
 Open the project folder and manually run **Stata: Start Shared Session** from
@@ -98,8 +98,9 @@ python3 "$WB_AGENT" stop --workflow /abs/receipts/stage01 --user-action 'stop it
 python3 "$WB_AGENT" reconcile --workflow /abs/receipts/stage01
 ```
 
-The Stop request checks the original session, generation and active run ID in
-the receiver. It returns before restoration finishes. Keep observing that
+The CLI matches the workflow's reserved request ID to the active request and
+uses its current Terminal run ID as the Stop target. The receiver rechecks the
+original session, generation and active run ID. It returns before restoration finishes. Keep observing that
 original workflow until the receipt confirms the Stop restored the pre-run
 checkpoint and the session is ready. Code may have partly run before Stop;
 external file writes are not undone. A user clicking Workbench Stop is recorded

@@ -2,7 +2,7 @@
   "name": "stata-workbench-shared-session",
   "displayName": "Stata Workbench Shared Session",
   "description": "Visible human-agent Stata sessions in VS Code: shared state, live output, reviewable edits and independent analysis windows.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "lzhs1995",
   "author": "LZHS and contributors",
   "license": "AGPL-3.0-or-later",

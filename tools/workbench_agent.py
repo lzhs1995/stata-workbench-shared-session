@@ -252,13 +252,18 @@ def stop(directory, user_action, bridge=None):
     if prior:
         return {**output, "stop": prior, "automaticRetry": False}
     run = output["originalRun"]
-    if not run or output["status"].get("runId") != run["runId"] or output["status"].get("busy") is not True:
+    status = output["status"]
+    # bindRun reserves the HTTP request ID before Terminal adopts its own run ID.
+    # Only the exact request binding permits Stop of that current canonical run.
+    current_run_id = status.get("runId")
+    if (not run or status.get("requestId") != run["runId"] or status.get("busy") is not True
+            or not isinstance(current_run_id, str) or not ID.fullmatch(current_run_id)):
         return {**output, "state": "stop-pending-original-run", "automaticRetry": False}
     check_identity(workflow["identity"], output["observedIdentity"])
     # A durable claim precedes Stop input. Lost response -> only reconcile.
-    write(directory / "stop-dispatch.json", {"runId": run["runId"], "atEpoch": time.time()})
+    write(directory / "stop-dispatch.json", {"runId": current_run_id, "requestId": run["runId"], "atEpoch": time.time()})
     bridge = bridge or entry.LocalBridge()
-    request = {"expectedRunId": run["runId"], "sessionId": workflow["identity"]["sessionId"], "generation": workflow["identity"]["generation"]}
+    request = {"expectedRunId": current_run_id, "sessionId": workflow["identity"]["sessionId"], "generation": workflow["identity"]["generation"]}
     code, body = bridge.request("/agent-stop", request, timeout=10)
     response = {"http": code, "body": body}
     write(directory / "stop-response.json", response)

@@ -1,6 +1,6 @@
-# Agent entry point — Stata Workbench Shared Session 0.2.0
+# Agent entry point — Stata Workbench Shared Session 0.2.1
 
-**0.2.0 is a candidate undergoing delivery, not a released or live-accepted
+**0.2.1 is a candidate undergoing delivery, not a released or live-accepted
 daily package.** These instructions target extension ID
 `lzhs1995.stata-workbench-shared-session`. They apply to shell-capable agents;
 they do not establish that Codex, Claude Code or another host has completed
@@ -10,8 +10,8 @@ actual-host acceptance.
 
 Read [README](README.md) ([简体中文](README.zh-CN.md),
 [繁體中文](README.zh-TW.md)) and [the daily agent workflow](docs/agent-daily-workflow.md).
-Use a locally supplied, reviewed 0.2.0 VSIX and its matching installed tools.
-There is no asserted public 0.2.0 download URL yet. The separately versioned
+Use a locally supplied, reviewed 0.2.1 VSIX and its matching installed tools.
+There is no asserted public 0.2.1 download URL yet. The separately versioned
 [operating skill](https://github.com/lzhs1995/stata-workbench-shared-session-skill)
 must explicitly match the installed build before use; an rc.7.45 or Next pin
 does not certify this candidate.
@@ -123,7 +123,7 @@ checks and licensed live acceptance belong to separately scoped work.
 
 The README's [platform results](README.md#platform-test-results) are historical
 Next builds using isolated profiles. They do not validate the ordinary-window
-0.2.0 candidate, human interaction or actual agent discovery. No native
+0.2.1 candidate, human interaction or actual agent discovery. No native
 Codex/Claude Stop/diff/continue hooks are installed by these instructions.
 Preserve private workflow receipts and original attempts; do not commit research
 data, registry tokens, logs or `.stata-receipts/`.

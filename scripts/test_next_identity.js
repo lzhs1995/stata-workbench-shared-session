@@ -37,7 +37,7 @@ const port = pkg.contributes.configuration.properties["stataMcp.visibleBridgePor
 assert.equal(port.default, 0);
 assert.equal(pkg.publisher, "lzhs1995");
 assert.equal(pkg.name, "stata-workbench-shared-session");
-assert.equal(pkg.version, "0.2.0");
+assert.equal(pkg.version, "0.2.1");
 assert.equal(/\(Next\)$/.test(pkg.displayName), false);
 assert.ok(bundle.includes("__port=globalThis.__codexWindowSession.requestedPort"));
 assert.ok(bundle.includes("onBound:__state=>{__port=__state.port;"));

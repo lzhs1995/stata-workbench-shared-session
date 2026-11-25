@@ -4,7 +4,7 @@
 
 <img src="media/icon.png" alt="Stata Workbench Shared Session 圖示" width="96">
 
-> **0.2.0 候選版：交付進行中，尚未釋出。** 以下一般視窗工作流程描述的是候選版。
+> **0.2.1 候選版：交付進行中，尚未釋出。** 以下一般視窗工作流程描述的是候選版。
 > 仍須針對確切安裝套件完成安裝、實機驗收，以及實際 Codex／Claude 宿主互動檢查。
 > 下方保留的 Next 歷史結果不能證明這些項目已通過。
 
@@ -44,7 +44,7 @@ Next 是獨立預覽版，不會取代既有的研究工作階段。
 
 ## 候選版識別資訊
 
-| 項目 | 0.2.0 候選版 |
+| 項目 | 0.2.1 候選版 |
 | --- | --- |
 | 擴充套件 ID | `lzhs1995.stata-workbench-shared-session` |
 | 手動入口 | 在目標一般視窗執行 **Stata: Start Shared Session** |
@@ -56,7 +56,7 @@ Next 是獨立預覽版，不會取代既有的研究工作階段。
 
 Next 仍是開發分支。隔離啟動器、五工作階段測試、`~/.stata-workbench-next` 根目錄
 和 Next 擴充套件 ID 都屬於歷史預覽版，不能當作一般視窗的設定方式。
-操作技能獨立維護版本；舊 rc.7.45 相容紀錄不能證明 0.2.0 相容。
+操作技能獨立維護版本；舊 rc.7.45 相容紀錄不能證明 0.2.1 相容。
 請勿在目標視窗同時啟用 Shared Session 和 Next。
 
 ## 環境要求
@@ -87,8 +87,8 @@ Windows 是 `%LOCALAPPDATA%\stata-workbench\mcp-stata-1.26.1`。
 
 ## 安裝
 
-1. 向交付負責人取得本機提供、經審閱的 `stata-workbench-shared-session-0.2.0.vsix`
-   和完整 SHA256。目前沒有宣告可用的公開 0.2.0 釋出網址。
+1. 向交付負責人取得本機提供、經審閱的 `stata-workbench-shared-session-0.2.1.vsix`
+   和完整 SHA256。目前沒有宣告可用的公開 0.2.1 釋出網址。
    macOS 使用 `shasum -a 256 /absolute/path/to/file.vsix`；Windows 使用
    `(Get-FileHash 'C:\absolute\path\file.vsix' -Algorithm SHA256).Hash.ToLower()`。
    安裝前將完整值與經審閱的交付值核對。
@@ -225,7 +225,7 @@ CLI 也接受放在子命令**之前**的 `--state-root /absolute/path`，用來
 
 ## 已知限制
 
-**0.2.0 一般視窗套件尚未完成交付驗收。** 仍須針對確切套件完成 macOS／Windows 安裝、
+**0.2.1 一般視窗套件尚未完成交付驗收。** 仍須針對確切套件完成 macOS／Windows 安裝、
 同一設定檔下的雙視窗隔離、實際 Codex／Claude 尋找與執行、由人操作 diff 的
 Accept／編輯／繼續，以及 Stop 和恢復／關閉檢查。離線測試、安裝成功與 Next 歷史實測
 都不能證明這些項目已通過。本指南沒有安裝宿主原生 Stop／diff／continue hook。
@@ -235,7 +235,7 @@ Accept／編輯／繼續，以及 Stop 和恢復／關閉檢查。離線測試�
 <summary>Next 歷史限制與修正——僅對應原始建置版本</summary>
 
 以下保留原 Next 建置版本及隔離啟動器的紀錄。其中的「main」、五工作階段、啟動旗標和
-設定目錄都是歷史資訊；不能把這些設定／恢復做法套用到 0.2.0 一般視窗。
+設定目錄都是歷史資訊；不能把這些設定／恢復做法套用到 0.2.1 一般視窗。
 
 `main` 上已修復（`e9b22430`，PR #17），並已在 Windows 上用 `3765d82a`（11-03）實機確認，另有註明的除外：
 
@@ -291,7 +291,7 @@ Accept／編輯／繼續，以及 Stop 和恢復／關閉檢查。離線測試�
 
 ## 平台實測結果
 
-**僅供歷史證據參考。** 以下為原 Next 測試結果，不是 0.2.0 候選版、一般視窗，
+**僅供歷史證據參考。** 以下為原 Next 測試結果，不是 0.2.1 候選版、一般視窗，
 或實際人與 agent 宿主互動的驗收結果。保留原建置雜湊及限制，不重新標記為新版通過。
 
 <details>

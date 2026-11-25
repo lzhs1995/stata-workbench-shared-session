@@ -4,7 +4,7 @@
 
 <img src="media/icon.png" alt="Stata Workbench 共享会话图标" width="96">
 
-> **0.2.0 候选版——正在交付，尚未发布。** 下述普通窗口流程针对本候选版。
+> **0.2.1 候选版——正在交付，尚未发布。** 下述普通窗口流程针对本候选版。
 > 精确安装包的安装、实机验收及实际 Codex/Claude 宿主交互仍需完成。
 > 下方保留的 Next 历史结果不能证明这些检查已通过。
 
@@ -44,7 +44,7 @@
 
 ## 候选版身份
 
-| 项目 | 0.2.0 候选版 |
+| 项目 | 0.2.1 候选版 |
 | --- | --- |
 | 扩展 ID | `lzhs1995.stata-workbench-shared-session` |
 | 手动入口 | 在目标普通窗口运行 **Stata: Start Shared Session** |
@@ -55,7 +55,7 @@
 | Agent 客户端 | 已安装扩展内的 `tools/workbench_agent.py` |
 
 Next 仍是开发分支。它的隔离启动器、五会话测试、`~/.stata-workbench-next` 根目录和扩展 ID
-属于历史预览版，不是普通窗口的设置步骤。操作技能独立版本化；旧 rc.7.45 兼容记录不能认证 0.2.0。
+属于历史预览版，不是普通窗口的设置步骤。操作技能独立版本化；旧 rc.7.45 兼容记录不能认证 0.2.1。
 不要在目标窗口同时启用 Shared Session 与 Next。
 
 ## 环境要求
@@ -85,8 +85,8 @@ agent 工具所需的 Python 3.10 或更高版本。还须先准备匹配的 Sta
 
 ## 安装
 
-1. 从交付负责人处取得本地提供、已审阅的 `stata-workbench-shared-session-0.2.0.vsix`
-   及其精确 SHA256。目前不提供尚未确认的 0.2.0 公开发布地址。
+1. 从交付负责人处取得本地提供、已审阅的 `stata-workbench-shared-session-0.2.1.vsix`
+   及其精确 SHA256。目前不提供尚未确认的 0.2.1 公开发布地址。
    macOS 使用 `shasum -a 256 /absolute/path/to/file.vsix`；Windows 使用
    `(Get-FileHash 'C:\absolute\path\file.vsix' -Algorithm SHA256).Hash.ToLower()`。
    安装前，将完整值与已审阅交付记录核对。
@@ -218,7 +218,7 @@ CLI 还接受放在子命令**之前**的 `--state-root /absolute/path`，它选
 
 ## 已知限制
 
-**0.2.0 普通窗口安装包尚未完成交付验收。** 待完成的检查包括精确安装包在 macOS/Windows 上的安装、
+**0.2.1 普通窗口安装包尚未完成交付验收。** 待完成的检查包括精确安装包在 macOS/Windows 上的安装、
 同配置双窗口隔离、实际 Codex/Claude 的发现与执行、真人 diff Accept/改稿/继续、Stop 与恢复/关闭。
 离线测试、安装成功和历史 Next 实机结果都不能替代这些检查。
 本指南不安装原生宿主的 Stop/diff/continue hook。远程扩展宿主、Linux 及其他未列出的系统变体未验证。
@@ -227,7 +227,7 @@ CLI 还接受放在子命令**之前**的 `--state-root /absolute/path`，它选
 <summary>Next 历史限制与修复——仅适用于原构建</summary>
 
 以下保留记录描述具名 Next 构建及其隔离启动器。“main”、五会话、启动选项和配置目录等内容均属历史，
-不要把其中的安装或恢复步骤用于 0.2.0 普通窗口。
+不要把其中的安装或恢复步骤用于 0.2.1 普通窗口。
 
 `main` 上已修复（`e9b22430`，PR #17），并已在 Windows 上用 `3765d82a`（11-03）实机确认，另有注明的除外：
 
@@ -283,7 +283,7 @@ CLI 还接受放在子命令**之前**的 `--state-root /absolute/path`，它选
 
 ## 平台实测结果
 
-**仅为历史证据。** 以下是原 Next 结果，不是 0.2.0 候选版、普通窗口或实际真人/agent 宿主的验收通过记录。
+**仅为历史证据。** 以下是原 Next 结果，不是 0.2.1 候选版、普通窗口或实际真人/agent 宿主的验收通过记录。
 原构建哈希与限制按原样保留，不重新标注归属。
 
 <details>

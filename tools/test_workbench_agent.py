@@ -12,6 +12,13 @@ import workbench_agent as agent
 
 
 class WorkflowTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # Exercise the real JS reservation/lifecycle contract using synthetic IDs.
+        fixture = Path(__file__).resolve().parents[1] / "tests/fixtures/workflow_run_binding.cjs"
+        observed = subprocess.run(["node", str(fixture)], check=True, capture_output=True, text=True, timeout=15)
+        cls.dual_id_fixture = json.loads(observed.stdout)
+
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
@@ -23,7 +30,7 @@ class WorkflowTests(unittest.TestCase):
             "sessionId": "s1", "generation": 3}
         self.directory, self.wf = agent.create_workflow(self.root / "workflow", self.file, self.root, self.ident, self.doc, "Codex")
         self.bridge = Mock()
-        self.bridge.status.return_value = {"busy": True, "runId": "r1", "postRunBusy": False, "trueReady": False, "recovery": {"required": False}}
+        self.bridge.status.return_value = {"busy": True, "requestId": "r1", "runId": "r1", "postRunBusy": False, "trueReady": False, "recovery": {"required": False}}
         self.run = {"workflowId": self.wf["workflowId"], "sessionId": "s1", "generation": 3,
             "sourcePath": str(self.file), "sourceSha256": self.wf["sourceSha256"], "runId": "r1"}
         self.bridge.request.side_effect = self.request
@@ -144,8 +151,96 @@ class WorkflowTests(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0].args[1], {"expectedRunId": "r1", "sessionId": "s1", "generation": 3})
 
+    def dual_ids(self):
+        evidence = self.dual_id_fixture
+        self.run.update(runId=evidence["reservation"]["runId"], status="reserved")
+        self.bridge.status.return_value.update(evidence["activeStatus"])
+        return evidence
+
+    def test_actual_bridge_request_id_adoption_stops_canonical_run(self):
+        evidence = self.dual_ids()
+        result = agent.stop(self.directory, "stop original workflow", self.bridge)
+        self.assertEqual(result["state"], "stop-requested")
+        calls = [c for c in self.bridge.request.call_args_list if c.args[0] == "/agent-stop"]
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(calls[0].args[1], {"expectedRunId": evidence["activeStatus"]["runId"], "sessionId": "s1", "generation": 3})
+        claim = agent.read(self.directory / "stop-dispatch.json")
+        self.assertEqual(claim["runId"], evidence["activeStatus"]["runId"])
+        self.assertEqual(claim["requestId"], evidence["reservation"]["runId"])
+        self.bridge.http_post.assert_not_called()
+
+    def test_actual_bridge_request_id_mismatch_never_stops(self):
+        self.dual_ids()
+        self.bridge.status.return_value["requestId"] = "different_request"
+        result = agent.stop(self.directory, "stop original workflow", self.bridge)
+        self.assertEqual(result["state"], "stop-pending-original-run")
+        self.assertFalse((self.directory / "stop-dispatch.json").exists())
+        self.assertFalse(any(c.args[0] == "/agent-stop" for c in self.bridge.request.call_args_list))
+
+    def test_missing_request_binding_is_not_replaced_by_equal_run_id(self):
+        self.bridge.status.return_value.pop("requestId")
+        result = agent.stop(self.directory, "stop original workflow", self.bridge)
+        self.assertEqual(result["state"], "stop-pending-original-run")
+        self.assertFalse(any(c.args[0] == "/agent-stop" for c in self.bridge.request.call_args_list))
+
+    def test_malformed_canonical_run_never_stops(self):
+        for invalid in (None, "", [], 7, "run/foreign"):
+            with self.subTest(invalid=invalid):
+                self.dual_ids()
+                self.bridge.status.return_value["runId"] = invalid
+                result = agent.stop(self.directory, "stop original workflow", self.bridge)
+                self.assertEqual(result["state"], "stop-pending-original-run")
+        self.assertFalse((self.directory / "stop-dispatch.json").exists())
+        self.assertFalse(any(c.args[0] == "/agent-stop" for c in self.bridge.request.call_args_list))
+
+    def test_dual_id_stop_lost_response_never_retries(self):
+        self.dual_ids()
+        original = self.request
+        self.bridge.request.side_effect = lambda url, *a, **k: (_ for _ in ()).throw(TimeoutError("lost stop response")) if url == "/agent-stop" else original(url, *a, **k)
+        with self.assertRaises(TimeoutError):
+            agent.stop(self.directory, "stop original workflow", self.bridge)
+        with self.assertRaises(FileExistsError):
+            agent.stop(self.directory, "stop original workflow", self.bridge)
+        self.assertEqual(sum(c.args[0] == "/agent-stop" for c in self.bridge.request.call_args_list), 1)
+        self.assertFalse((self.directory / "stop-response.json").exists())
+        self.bridge.http_post.assert_not_called()
+
+    def test_dual_id_stop_server_race_refusal_is_preserved_once(self):
+        self.dual_ids()
+        original = self.request
+        self.bridge.request.side_effect = lambda url, *a, **k: (409, {"error": "STOP_TARGET_CHANGED", "payloadDispatched": False}) if url == "/agent-stop" else original(url, *a, **k)
+        result = agent.stop(self.directory, "stop original workflow", self.bridge)
+        self.assertEqual(result["state"], "stop-refused")
+        agent.stop(self.directory, "stop original workflow", self.bridge)
+        self.assertEqual(sum(c.args[0] == "/agent-stop" for c in self.bridge.request.call_args_list), 1)
+
+    def test_dual_id_generation_change_never_stops(self):
+        self.dual_ids()
+        self.ident["generation"] += 1
+        with self.assertRaisesRegex(RuntimeError, "SESSION_CHANGED"):
+            agent.stop(self.directory, "stop original workflow", self.bridge)
+        self.assertFalse((self.directory / "stop-dispatch.json").exists())
+        self.assertFalse(any(c.args[0] == "/agent-stop" for c in self.bridge.request.call_args_list))
+
+    def test_dual_id_idle_does_not_dispatch_or_create_success(self):
+        self.dual_ids()
+        self.bridge.status.return_value.update(busy=False, trueReady=True)
+        result = agent.stop(self.directory, "stop original workflow", self.bridge)
+        self.assertEqual(result["state"], "stop-pending-original-run")
+        self.assertIsNone(result["verdict"])
+        self.assertFalse(any(c.args[0] == "/agent-stop" for c in self.bridge.request.call_args_list))
+
+    def test_completed_receipt_preserves_success_without_stop(self):
+        self.dual_ids()
+        self.bridge.status.return_value.update(busy=False, trueReady=True)
+        self.receipt({"verdict": "PASS_VISIBLE_SHARED_RUN", "postCount": 1})
+        result = agent.stop(self.directory, "stop original workflow", self.bridge)
+        self.assertEqual(result["state"], "completed")
+        self.assertFalse((self.directory / "stop-intent.json").exists())
+        self.assertFalse(any(c.args[0] == "/agent-stop" for c in self.bridge.request.call_args_list))
+
     def test_stop_will_not_cancel_somebody_elses_run(self):
-        self.bridge.status.return_value["runId"] = "other"
+        self.bridge.status.return_value.update(requestId="other", runId="other")
         self.assertEqual(agent.stop(self.directory, "stop it", self.bridge)["state"], "stop-pending-original-run")
         self.assertFalse(any(c.args[0] == "/agent-stop" for c in self.bridge.request.call_args_list))
 

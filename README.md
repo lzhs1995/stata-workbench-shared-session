@@ -4,7 +4,7 @@
 
 <img src="media/icon.png" alt="Stata Workbench Shared Session icon" width="96">
 
-> **0.2.0 candidate — undergoing delivery, not released.** The ordinary-window
+> **0.2.1 candidate — undergoing delivery, not released.** The ordinary-window
 > workflow below describes the candidate. Exact-package installation, live
 > acceptance and actual Codex/Claude host interactions are still required.
 > Historical Next results below do not establish those passes.
@@ -55,7 +55,7 @@ preview and does not replace an existing research session.
 
 ## Candidate identity
 
-| Item | 0.2.0 candidate |
+| Item | 0.2.1 candidate |
 | --- | --- |
 | Extension ID | `lzhs1995.stata-workbench-shared-session` |
 | Manual entry | **Stata: Start Shared Session** in the intended ordinary window |
@@ -68,7 +68,7 @@ preview and does not replace an existing research session.
 Next remains the development line. Its isolated launcher, five-session tests,
 `~/.stata-workbench-next` root and extension ID belong to historical previews.
 Do not use them as the ordinary-window setup. The operating skill is versioned
-separately: its old rc.7.45 compatibility record does not certify 0.2.0.
+separately: its old rc.7.45 compatibility record does not certify 0.2.1.
 Do not enable both Shared Session and Next in the target window.
 
 ## Requirements
@@ -109,9 +109,9 @@ insufficient space. These are candidate requirements, not current live-test clai
 
 ## Install
 
-1. Obtain the locally supplied, reviewed `stata-workbench-shared-session-0.2.0.vsix`
+1. Obtain the locally supplied, reviewed `stata-workbench-shared-session-0.2.1.vsix`
    and its exact SHA256 from the delivery owner. There is no asserted public
-   0.2.0 release URL yet. On macOS use `shasum -a 256 /absolute/path/to/file.vsix`;
+   0.2.1 release URL yet. On macOS use `shasum -a 256 /absolute/path/to/file.vsix`;
    on Windows use `(Get-FileHash 'C:\absolute\path\file.vsix' -Algorithm SHA256).Hash.ToLower()`.
    Compare the complete value with the reviewed delivery before installing.
 2. In the ordinary VS Code profile you intend to use, choose **Extensions →
@@ -263,7 +263,7 @@ Do not copy tokens or hand-edit session ownership records.
 
 ## Known limitations
 
-The **0.2.0 ordinary-window package has not yet completed delivery acceptance**.
+The **0.2.1 ordinary-window package has not yet completed delivery acceptance**.
 Current requirements include exact-package macOS/Windows installation,
 same-profile two-window isolation, actual Codex/Claude discovery and execution,
 human diff Accept/edit/continue, Stop and recovery/close checks. Offline tests,
@@ -276,7 +276,7 @@ extension hosts, Linux and other unlisted OS variants are not validated.
 
 The following retained notes describe the named Next builds and their isolated
 launcher. References to “main”, five sessions, startup flags and profile paths
-are historical; do not apply those setup/recovery recipes to 0.2.0 ordinary windows.
+are historical; do not apply those setup/recovery recipes to 0.2.1 ordinary windows.
 
 Fixed on `main` (`e9b22430`, PR #17) and confirmed live on Windows on `3765d82a`, 11-03, except where noted:
 
@@ -333,7 +333,7 @@ Open problems on the current `main`:
 ## Platform test results
 
 **Historical evidence only.** These are the original Next results, not passes
-for the 0.2.0 candidate, ordinary windows or actual human/agent-host acceptance.
+for the 0.2.1 candidate, ordinary windows or actual human/agent-host acceptance.
 Their build hashes and limitations are retained without relabeling.
 
 <details>

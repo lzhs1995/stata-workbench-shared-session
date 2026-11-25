@@ -1,3 +1,9 @@
+## 0.2.1 candidate — Stop follows the original workflow's execution
+
+- Agent Stop now matches the workflow's reserved HTTP request ID to the active request, then targets that request's Terminal run ID. A distinct Terminal ID no longer leaves the original active workflow indefinitely pending.
+- Missing or mismatched request bindings, changed sessions or generations and idle sessions still refuse Stop. The durable claim records both IDs; an unknown Stop response never permits another Stop submission.
+- Synthetic regression fixtures call the actual reservation, lifecycle and server Stop guard functions. This candidate still requires exact-package installation and live acceptance; earlier candidate and Next evidence remain historical.
+
 ## 0.2.0 candidate — Cancel before the first session start
 
 - Cancel on a confirmed cold, idle session returns a no-op without preparing a runtime, reserving an engine slot, connecting, running a quiescence command or advancing recovery state. The notice says that nothing was stopped or restored.
