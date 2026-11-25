@@ -25,7 +25,7 @@ class SetupTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name).resolve()
-        package = {"name": "stata-workbench-shared-session", "publisher": "lzhs1995", "version": "0.2.0",
+        package = {"name": "stata-workbench-shared-session", "publisher": "lzhs1995", "version": json.loads((Path(__file__).resolve().parents[1] / "package.json").read_bytes())["version"],
                    "main": "./dist/extension.js", "activationEvents": ["onStartupFinished"],
                    "capabilities": {"untrustedWorkspaces": {"supported": False}},
                    "engines": {"vscode": "^1.90.0"}, "contributes": {"commands": []}}
@@ -93,6 +93,12 @@ class SetupTests(unittest.TestCase):
             shim.parent.mkdir(exist_ok=True)
             shim.write_text(launcher, encoding="utf-8")
         return executable, shim
+
+    def test_declared_setup_version_matches_current_package(self):
+        package = json.loads((Path(__file__).resolve().parents[1] / "package.json").read_bytes())
+        self.assertEqual(setup.VERSION, package["version"])
+        verified = setup.verify_vsix(self.file, self.digest)
+        self.assertEqual(verified["package"]["version"], package["version"])
 
     def test_hash_mismatch_never_invokes_install_or_creates_receipt(self):
         run = Mock()

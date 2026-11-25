@@ -15,7 +15,7 @@ import zipfile
 import workbench_platform as host
 
 EXTENSION_ID = "lzhs1995.stata-workbench-shared-session"
-VERSION = "0.2.0"
+VERSION = "0.2.1"
 RECEIPT_SCHEMA = "stata-workbench-install/1"
 COPY_NAME = "verified-candidate.vsix"
 
