@@ -8,6 +8,21 @@ A VS Code extension that lets a person and AI agents use one visible Stata
 session in turn. Both send code to the same backend, so data, macros, scalars,
 results and graphs are shared.
 
+## Demo
+
+- [Quick overview (30 seconds)](https://youtu.be/o5j_lmpXTs0)
+- [Walkthrough (3:20)](https://youtu.be/L7Q0aul5MkE)
+
+Historical recordings and genuine rehearsal receipts show synthetic data loaded in VS Code and a do-file submitted to the same Stata session. Human UI actions are scripted. The walkthrough distinguishes 1,200 loaded rows from 1,141 regression observations and labels the model-to-disk command as an unexecuted example.
+
+Silent, edited videos with burned-in Traditional Chinese and English captions.
+
+歷史實錄與真實彩排回執展示在 VS Code 載入合成資料，再將 do 檔送入同一 Stata 會話；人的 UI 操作由腳本代打。詳片區分 1,200 列資料與 1,141 筆估計樣本，並將模型落盤命令標為未執行示例。
+
+無聲剪輯版，附繁中／英文燒錄字幕。
+
+Derived from [tmonk/stata-workbench](https://github.com/tmonk/stata-workbench).
+
 <!-- portfolio-stata-navigation-20261110 -->
 ## Project family · 專案導覽
 
